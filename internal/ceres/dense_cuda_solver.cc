@@ -61,7 +61,6 @@ DenseCudaSolver::DenseCudaSolver() :
     num_cols_(0),
     gpu_a_(nullptr),
     gpu_b_(nullptr),
-    gpu_x_(nullptr),
     max_num_cols_(0),
     gpu_scratch_(nullptr),
     gpu_scratch_size_(0),
@@ -76,21 +75,21 @@ DenseCudaSolver::DenseCudaSolver() :
 }
 
 DenseCudaSolver::~DenseCudaSolver() {
+  CHECK_EQ(cudaFree(gpu_error_), cudaSuccess);
+  if (gpu_scratch_) {
+    CHECK_EQ(cudaFree(gpu_scratch_), cudaSuccess);
+  }
+  if (host_scratch_) {
+    free(host_scratch_);
+  }
   if (gpu_a_) {
     CHECK_EQ(cudaFree(gpu_a_), cudaSuccess);
   }
   if (gpu_b_) {
     CHECK_EQ(cudaFree(gpu_b_), cudaSuccess);
   }
-  if (gpu_x_) {
-    CHECK_EQ(cudaFree(gpu_x_), cudaSuccess);
-  }
-  if (stream_) {
-    CHECK_EQ(cudaStreamDestroy(stream_), cudaSuccess);
-  }
-  if (cusolver_handle_) {
-    CHECK_EQ(cusolverDnDestroy(cusolver_handle_), CUSOLVER_STATUS_SUCCESS);
-  }
+  CHECK_EQ(cusolverDnDestroy(cusolver_handle_), CUSOLVER_STATUS_SUCCESS);
+  CHECK_EQ(cudaStreamDestroy(stream_), cudaSuccess);
 }
 
 void DenseCudaSolver::AllocateGPUMemory(size_t num_cols) {
@@ -99,10 +98,8 @@ void DenseCudaSolver::AllocateGPUMemory(size_t num_cols) {
   }
   const size_t sizeof_a = num_cols * num_cols * sizeof(double);
   const size_t sizeof_b = num_cols * sizeof(double);
-  const size_t sizeof_x = num_cols * sizeof(double);
   CudaRealloc(reinterpret_cast<void**>(&gpu_a_), sizeof_a);
   CudaRealloc(reinterpret_cast<void**>(&gpu_b_), sizeof_b);
-  CudaRealloc(reinterpret_cast<void**>(&gpu_x_), sizeof_x);
   max_num_cols_ = num_cols;
 }
 
@@ -177,11 +174,11 @@ LinearSolverTerminationType DenseCudaSolver::CholeskyFactorize(
 }
 
 LinearSolverTerminationType DenseCudaSolver::CholeskySolve(
-    const double* rhs, double* solution, std::string* message) {
+    const double* B, double* X, std::string* message) {
 
-  // Copy rhs to GPU.
+  // Copy B to GPU.
   CHECK_EQ(cudaMemcpyAsync(gpu_b_,
-                           rhs,
+                           B,
                            num_cols_ * sizeof(double),
                            cudaMemcpyHostToDevice),
            cudaSuccess);
@@ -212,8 +209,8 @@ LinearSolverTerminationType DenseCudaSolver::CholeskySolve(
     *message = "cuSOLVER Cholesky solve failed.";
     return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
   }
-  // Copy solution from GPU to host.
-  CHECK_EQ(cudaMemcpy(solution,
+  // Copy X from GPU to host.
+  CHECK_EQ(cudaMemcpy(X,
                       gpu_b_,
                       num_cols_ * sizeof(double),
                       cudaMemcpyDeviceToHost),

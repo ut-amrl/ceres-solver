@@ -57,8 +57,11 @@ class DenseCudaSolver {
                                                 double* A,
                                                 std::string* message);
 
-  LinearSolverTerminationType CholeskySolve(const double* rhs,
-                                            double* solution,
+  // Solve the linear system A * X = B, using the previously computed Cholesky
+  // factorization of A. The user must ensure that CholeskyFactorize() has been
+  // called before calling this method.
+  LinearSolverTerminationType CholeskySolve(const double* B,
+                                            double* X,
                                             std::string* message);
 
   // Make sure that there is sufficient memory allocated on the GPU for the
@@ -77,13 +80,10 @@ class DenseCudaSolver {
   double* gpu_a_;
   // Pointer to GPU memory allocated for the B matrix (rhs vector).
   double* gpu_b_;
-  // Pointer to GPU memory allocated for the X matrix (solution vector).
-  double* gpu_x_;
   // The largest number of columns asked to solve previously -- this is used to
   // keep track of the amount of GPU memory allocated so far:
   // gpu_a_ = double[max_num_cols_ * max_num_cols_]
   // gpu_b_ = double[max_num_cols_]
-  // gpu_x_ = double[max_num_cols_]
   size_t max_num_cols_;
   // Scratch space for cuSOLVER on the GPU.
   void* gpu_scratch_;
