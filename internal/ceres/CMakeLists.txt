@@ -73,6 +73,7 @@ set(CERES_INTERNAL_SRC
     covariance_impl.cc
     cxsparse.cc
     dense_cholesky.cc
+    dense_cuda_solver.cc
     dense_normal_cholesky_solver.cc
     dense_qr_solver.cc
     dense_sparse_matrix.cc
@@ -217,6 +218,15 @@ endif (CXSPARSE AND CXSPARSE_FOUND)
 if (ACCELERATESPARSE AND AccelerateSparse_FOUND)
   list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES ${AccelerateSparse_LIBRARIES})
 endif()
+
+if (CUDA_FOUND)
+  list(APPEND 
+       CERES_LIBRARY_PUBLIC_DEPENDENCIES 
+       ${CUDA_LIBRARIES}
+       ${CUDA_cusolver_LIBRARY}
+       ${CUDA_CUBLAS_LIBRARIES}
+       ${CUDA_cusparse_LIBRARY})
+endif (CUDA_FOUND)
 
 if (LAPACK_FOUND)
   list(APPEND CERES_LIBRARY_PRIVATE_DEPENDENCIES ${LAPACK_LIBRARIES})
@@ -523,6 +533,9 @@ if (BUILD_TESTING AND GFLAGS)
   ceres_test(trust_region_preprocessor)
   ceres_test(visibility)
   ceres_test(visibility_based_preconditioner)
+  if (CUDA)
+    ceres_test(dense_cuda_solver)
+  endif(CUDA)
 
   add_subdirectory(generated_bundle_adjustment_tests)
 
