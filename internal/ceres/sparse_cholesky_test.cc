@@ -38,6 +38,7 @@
 #include "Eigen/SparseCore"
 #include "ceres/block_sparse_matrix.h"
 #include "ceres/compressed_row_sparse_matrix.h"
+#include "ceres/cuda_sparse.h"
 #include "ceres/inner_product_computer.h"
 #include "ceres/internal/eigen.h"
 #include "ceres/iterative_refiner.h"
@@ -226,6 +227,22 @@ INSTANTIATE_TEST_SUITE_P(
                        ::testing::Values(AMD, NATURAL),
                        ::testing::Values(true, false)),
     ParamInfoToString);
+#endif
+
+#ifndef CERES_NO_CUDA
+INSTANTIATE_TEST_SUITE_P(CudaSparsesCholesky,
+                         SparseCholeskyTest,
+                         ::testing::Combine(::testing::Values(CUDA_SPARSE),
+                                            ::testing::Values(NATURAL),
+                                            ::testing::Values(false)),
+                         ParamInfoToString);
+
+INSTANTIATE_TEST_SUITE_P(CudaSparsesCholeskySingle,
+                         SparseCholeskyTest,
+                         ::testing::Combine(::testing::Values(CUDA_SPARSE),
+                                            ::testing::Values(NATURAL),
+                                            ::testing::Values(false)),
+                         ParamInfoToString);
 #endif
 
 #ifdef CERES_USE_EIGEN_SPARSE

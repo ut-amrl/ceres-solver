@@ -72,6 +72,7 @@ set(CERES_INTERNAL_SRC
     covariance.cc
     covariance_impl.cc
     cxsparse.cc
+    cuda_sparse.cc
     dense_cholesky.cc
     dense_cuda_solver.cc
     dense_normal_cholesky_solver.cc
@@ -220,8 +221,8 @@ if (ACCELERATESPARSE AND AccelerateSparse_FOUND)
 endif()
 
 if (CUDA_FOUND)
-  list(APPEND 
-       CERES_LIBRARY_PUBLIC_DEPENDENCIES 
+  list(APPEND
+       CERES_LIBRARY_PUBLIC_DEPENDENCIES
        ${CUDA_LIBRARIES}
        ${CUDA_cusolver_LIBRARY}
        ${CUDA_CUBLAS_LIBRARIES}

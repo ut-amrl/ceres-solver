@@ -91,7 +91,7 @@ DEFINE_string(visibility_clustering, "canonical_views",
               "single_linkage, canonical_views");
 
 DEFINE_string(sparse_linear_algebra_library, "suite_sparse",
-              "Options are: suite_sparse and cx_sparse.");
+              "Options are: suite_sparse, cx_sparse, and cuda_sparse.");
 DEFINE_string(dense_linear_algebra_library, "eigen",
               "Options are: eigen, lapack, and cuda");
 DEFINE_string(ordering, "automatic", "Options are: automatic, user.");

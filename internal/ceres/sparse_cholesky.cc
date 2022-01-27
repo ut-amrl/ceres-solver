@@ -32,6 +32,7 @@
 
 #include "ceres/accelerate_sparse.h"
 #include "ceres/cxsparse.h"
+#include "ceres/cuda_sparse.h"
 #include "ceres/eigensparse.h"
 #include "ceres/float_cxsparse.h"
 #include "ceres/float_suitesparse.h"
@@ -96,6 +97,14 @@ std::unique_ptr<SparseCholesky> SparseCholesky::Create(
 #else
       LOG(FATAL) << "Ceres was compiled without support for Apple's Accelerate "
                  << "framework solvers.";
+#endif
+
+    case CUDA_SPARSE:
+#ifndef CERES_NO_CUDA
+      sparse_cholesky = CudaSparseCholesky::Create(ordering_type);
+      break;
+#else
+      LOG(FATAL) << "Ceres was compiled without support for CUDA.";
 #endif
 
     default:

@@ -389,6 +389,8 @@ class CERES_EXPORT Solver {
         CX_SPARSE;
 #elif !defined(CERES_NO_ACCELERATE_SPARSE)
         ACCELERATE_SPARSE;
+#elif !defined(CERES_NO_CUDA)
+        CUDA_SPARSE;
 #else
         NO_SPARSE;
 #endif
