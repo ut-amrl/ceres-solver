@@ -29,6 +29,8 @@
 // Author: sameeragarwal@google.com (Sameer Agarwal)
 
 #include "ceres/dense_cholesky.h"
+#include "ceres/execution_summary.h"
+#include "ceres/map_util.h"
 
 #include <algorithm>
 #include <memory>
@@ -101,6 +103,7 @@ LinearSolverTerminationType DenseCholesky::FactorAndSolve(
 
 LinearSolverTerminationType EigenDenseCholesky::Factorize(
     int num_cols, double* lhs, std::string* message) {
+  ScopedExecutionTimer timer("Factorize", &execution_summary_);
   Eigen::Map<Eigen::MatrixXd> m(lhs, num_cols, num_cols);
   llt_.reset(new LLTType(m));
   if (llt_->info() != Eigen::Success) {
@@ -115,6 +118,7 @@ LinearSolverTerminationType EigenDenseCholesky::Factorize(
 LinearSolverTerminationType EigenDenseCholesky::Solve(const double* rhs,
                                                       double* solution,
                                                       std::string* message) {
+  ScopedExecutionTimer timer("Solve", &execution_summary_);
   if (llt_->info() != Eigen::Success) {
     *message = "Eigen failure. Unable to perform dense Cholesky factorization.";
     return LINEAR_SOLVER_FAILURE;
@@ -126,9 +130,27 @@ LinearSolverTerminationType EigenDenseCholesky::Solve(const double* rhs,
   return LINEAR_SOLVER_SUCCESS;
 }
 
+EigenDenseCholesky::~EigenDenseCholesky() {
+  if (true) {
+    printf("EigenDenseCholesky:\n");
+    execution_summary_.Print("Factorize");
+    execution_summary_.Print("Solve");
+  }
+}
+
 #ifndef CERES_NO_LAPACK
+
+LAPACKDenseCholesky::~LAPACKDenseCholesky() {
+  if (true) {
+    printf("LAPACKDenseCholesky:\n");
+    execution_summary_.Print("Factorize");
+    execution_summary_.Print("Solve");
+  }
+}
+
 LinearSolverTerminationType LAPACKDenseCholesky::Factorize(
     int num_cols, double* lhs, std::string* message) {
+  ScopedExecutionTimer timer("Factorize", &execution_summary_);
   lhs_ = lhs;
   num_cols_ = num_cols;
 
@@ -158,6 +180,7 @@ LinearSolverTerminationType LAPACKDenseCholesky::Factorize(
 LinearSolverTerminationType LAPACKDenseCholesky::Solve(const double* rhs,
                                                        double* solution,
                                                        std::string* message) {
+  ScopedExecutionTimer timer("Solve", &execution_summary_);
   const char uplo = 'L';
   const int nrhs = 1;
   int info = 0;

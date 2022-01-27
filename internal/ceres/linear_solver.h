@@ -325,6 +325,7 @@ class TypedLinearSolver : public LinearSolver {
       const LinearSolver::PerSolveOptions& per_solve_options,
       double* x) = 0;
 
+ protected:
   ExecutionSummary execution_summary_;
 };
 

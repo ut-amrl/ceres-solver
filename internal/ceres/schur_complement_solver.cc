@@ -123,6 +123,7 @@ LinearSolver::Summary SchurComplementSolver::SolveImpl(
 
   const CompressedRowBlockStructure* bs = A->block_structure();
   if (eliminator_.get() == NULL) {
+    ScopedExecutionTimer timer("InitEliminator", &execution_summary_);
     const int num_eliminate_blocks = options_.elimination_groups[0];
     const int num_f_blocks = bs->cols.size() - num_eliminate_blocks;
 
@@ -153,11 +154,14 @@ LinearSolver::Summary SchurComplementSolver::SolveImpl(
   std::fill(x, x + A->num_cols(), 0.0);
   event_logger.AddEvent("Setup");
 
-  eliminator_->Eliminate(BlockSparseMatrixData(*A),
-                         b,
-                         per_solve_options.D,
-                         lhs_.get(),
-                         rhs_.get());
+  {
+    ScopedExecutionTimer timer("Eliminate", &execution_summary_);
+    eliminator_->Eliminate(BlockSparseMatrixData(*A),
+                          b,
+                          per_solve_options.D,
+                          lhs_.get(),
+                          rhs_.get());
+  }
   event_logger.AddEvent("Eliminate");
 
   double* reduced_solution = x + A->num_cols() - lhs_->num_cols();
@@ -166,6 +170,7 @@ LinearSolver::Summary SchurComplementSolver::SolveImpl(
   event_logger.AddEvent("ReducedSolve");
 
   if (summary.termination_type == LINEAR_SOLVER_SUCCESS) {
+    ScopedExecutionTimer timer("BackSubstitute", &execution_summary_);
     eliminator_->BackSubstitute(
         BlockSparseMatrixData(*A), b, per_solve_options.D, reduced_solution, x);
     event_logger.AddEvent("BackSubstitute");
@@ -195,6 +200,7 @@ void DenseSchurComplementSolver::InitStorage(
 // Eigen's Cholesky factorization.
 LinearSolver::Summary DenseSchurComplementSolver::SolveReducedLinearSystem(
     const LinearSolver::PerSolveOptions& per_solve_options, double* solution) {
+  ScopedExecutionTimer timer("SolveReducedLinearSystem", &execution_summary_);
   LinearSolver::Summary summary;
   summary.num_iterations = 0;
   summary.termination_type = LINEAR_SOLVER_SUCCESS;
@@ -214,6 +220,15 @@ LinearSolver::Summary DenseSchurComplementSolver::SolveReducedLinearSystem(
   summary.termination_type = cholesky_->FactorAndSolve(
       num_rows, m->mutable_values(), rhs(), solution, &summary.message);
   return summary;
+}
+
+DenseSchurComplementSolver::~DenseSchurComplementSolver() {
+  if (true) {
+    printf("DenseSchurComplementSolver:\n");
+    execution_summary_.Print("Eliminate");
+    execution_summary_.Print("SolveReducedLinearSystem");
+    execution_summary_.Print("BackSubstitute");
+  }
 }
 
 SparseSchurComplementSolver::SparseSchurComplementSolver(

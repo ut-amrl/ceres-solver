@@ -41,6 +41,7 @@
 #include "ceres/block_sparse_matrix.h"
 #include "ceres/block_structure.h"
 #include "ceres/dense_cholesky.h"
+#include "ceres/execution_summary.h"
 #include "ceres/internal/port.h"
 #include "ceres/linear_solver.h"
 #include "ceres/schur_eliminator.h"
@@ -160,7 +161,7 @@ class DenseSchurComplementSolver : public SchurComplementSolver {
   DenseSchurComplementSolver(const DenseSchurComplementSolver&) = delete;
   void operator=(const DenseSchurComplementSolver&) = delete;
 
-  virtual ~DenseSchurComplementSolver() {}
+  virtual ~DenseSchurComplementSolver() override;
 
  private:
   void InitStorage(const CompressedRowBlockStructure* bs) final;

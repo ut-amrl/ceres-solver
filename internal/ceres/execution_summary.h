@@ -36,6 +36,7 @@
 #include <string>
 
 #include "ceres/internal/port.h"
+#include "ceres/map_util.h"
 #include "ceres/wall_time.h"
 
 namespace ceres {
@@ -56,6 +57,15 @@ class ExecutionSummary {
     CallStatistics& call_stats = statistics_[name];
     call_stats.time += value;
     ++call_stats.calls;
+  }
+
+  const void Print(const std::string& name) const {
+    const CallStatistics& call_stats = FindWithDefault(
+          statistics_, name, CallStatistics());
+    printf("  %30s: %7.3f (%4d)\n",
+          name.c_str(),
+          call_stats.time,
+          call_stats.calls);
   }
 
   const std::map<std::string, CallStatistics>& statistics() const {

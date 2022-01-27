@@ -37,7 +37,9 @@
 #include <vector>
 
 #include "ceres/dense_cuda_solver.h"
+#include "ceres/execution_summary.h"
 #include "ceres/linear_solver.h"
+#include "ceres/map_util.h"
 
 #include "cuda_runtime.h"
 #include "cusolverDn.h"
@@ -90,9 +92,18 @@ DenseCudaSolver::~DenseCudaSolver() {
   }
   CHECK_EQ(cusolverDnDestroy(cusolver_handle_), CUSOLVER_STATUS_SUCCESS);
   CHECK_EQ(cudaStreamDestroy(stream_), cudaSuccess);
+  if (true) {
+    printf("DenseCudaSolver:\n");
+    execution_summary_.Print("AllocateGPUMemory");
+    execution_summary_.Print("MemcpyHostToGPU");
+    execution_summary_.Print("MemcpyGPUToHost");
+    execution_summary_.Print("potrf");
+    execution_summary_.Print("potrs");
+  }
 }
 
 void DenseCudaSolver::AllocateGPUMemory(size_t num_cols) {
+  ScopedExecutionTimer timer("AllocateGPUMemory", &execution_summary_);
   if (num_cols <= max_num_cols_) {
     return;
   }
@@ -109,63 +120,72 @@ LinearSolverTerminationType DenseCudaSolver::CholeskyFactorize(
   // Allocate GPU memory if necessary.
   AllocateGPUMemory(num_cols);
   num_cols_ = num_cols;
-  // Copy A to GPU.
-  CHECK_EQ(cudaMemcpyAsync(gpu_a_,
-                           A,
-                           num_cols * num_cols * sizeof(double),
-                           cudaMemcpyHostToDevice),
-           cudaSuccess);
-
-  size_t device_scratch_size = 0;
-  size_t host_scratch_size = 0;
-  CHECK_EQ(cusolverDnXpotrf_bufferSize(cusolver_handle_,
-                                       nullptr,
-                                       CUBLAS_FILL_MODE_LOWER,
-                                       num_cols,
-                                       CUDA_R_64F,
-                                       gpu_a_,
-                                       num_cols,
-                                       CUDA_R_64F,
-                                       &device_scratch_size,
-                                       &host_scratch_size),
-           CUSOLVER_STATUS_SUCCESS);
-
-  // ALlocate GPU scratch memory.
-  CudaRealloc(reinterpret_cast<void**>(&gpu_scratch_), device_scratch_size);
-  gpu_scratch_size_ = std::max(gpu_scratch_size_, device_scratch_size);
-
-  // Allocate host scratch memory.
-  if (host_scratch_size > host_scratch_size_) {
-    CHECK_NOTNULL(realloc(
-        reinterpret_cast<void**>(&host_scratch_), host_scratch_size));
-    host_scratch_size_ = host_scratch_size;
+  {
+    ScopedExecutionTimer timer("MemcpyHostToGPU", &execution_summary_);
+    // Copy A to GPU.
+    CHECK_EQ(cudaMemcpy(gpu_a_,
+                        A,
+                        num_cols * num_cols * sizeof(double),
+                        cudaMemcpyHostToDevice),
+            cudaSuccess);
   }
 
-  // Perform Cholesky factorization.
-  CHECK_EQ(cusolverDnXpotrf(cusolver_handle_,
-                            nullptr,
-                            CUBLAS_FILL_MODE_LOWER,
-                            num_cols,
-                            CUDA_R_64F,
-                            gpu_a_,
-                            num_cols,
-                            CUDA_R_64F,
-                            gpu_scratch_,
-                            gpu_scratch_size_,
-                            host_scratch_,
-                            host_scratch_size_,
-                            gpu_error_),
-           CUSOLVER_STATUS_SUCCESS);
-  CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
-  CHECK_EQ(cudaStreamSynchronize(stream_), cudaSuccess);
+  {
+    ScopedExecutionTimer timer("potrf", &execution_summary_);
+    size_t device_scratch_size = 0;
+    size_t host_scratch_size = 0;
+    CHECK_EQ(cusolverDnXpotrf_bufferSize(cusolver_handle_,
+                                        nullptr,
+                                        CUBLAS_FILL_MODE_LOWER,
+                                        num_cols,
+                                        CUDA_R_64F,
+                                        gpu_a_,
+                                        num_cols,
+                                        CUDA_R_64F,
+                                        &device_scratch_size,
+                                        &host_scratch_size),
+            CUSOLVER_STATUS_SUCCESS);
 
-  // Check for errors.
+    // ALlocate GPU scratch memory.
+    CudaRealloc(reinterpret_cast<void**>(&gpu_scratch_), device_scratch_size);
+    gpu_scratch_size_ = std::max(gpu_scratch_size_, device_scratch_size);
+
+    // Allocate host scratch memory.
+    if (host_scratch_size > host_scratch_size_) {
+      CHECK_NOTNULL(realloc(
+          reinterpret_cast<void**>(&host_scratch_), host_scratch_size));
+      host_scratch_size_ = host_scratch_size;
+    }
+
+    // Perform Cholesky factorization.
+    CHECK_EQ(cusolverDnXpotrf(cusolver_handle_,
+                              nullptr,
+                              CUBLAS_FILL_MODE_LOWER,
+                              num_cols,
+                              CUDA_R_64F,
+                              gpu_a_,
+                              num_cols,
+                              CUDA_R_64F,
+                              gpu_scratch_,
+                              gpu_scratch_size_,
+                              host_scratch_,
+                              host_scratch_size_,
+                              gpu_error_),
+            CUSOLVER_STATUS_SUCCESS);
+    CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
+    CHECK_EQ(cudaStreamSynchronize(stream_), cudaSuccess);
+  }
+
   int error = 0;
-  CHECK_EQ(cudaMemcpy(&error,
-                      gpu_error_,
-                      sizeof(int),
-                      cudaMemcpyDeviceToHost),
-           cudaSuccess);
+  {
+    ScopedExecutionTimer timer("MemcpyGPUToHost", &execution_summary_);
+    // Check for errors.
+    CHECK_EQ(cudaMemcpy(&error,
+                        gpu_error_,
+                        sizeof(int),
+                        cudaMemcpyDeviceToHost),
+            cudaSuccess);
+  }
   if (error != 0) {
     *message = "cuSOLVER Cholesky factorization failed.";
     return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
@@ -176,45 +196,55 @@ LinearSolverTerminationType DenseCudaSolver::CholeskyFactorize(
 LinearSolverTerminationType DenseCudaSolver::CholeskySolve(
     const double* B, double* X, std::string* message) {
 
-  // Copy B to GPU.
-  CHECK_EQ(cudaMemcpyAsync(gpu_b_,
-                           B,
-                           num_cols_ * sizeof(double),
-                           cudaMemcpyHostToDevice),
-           cudaSuccess);
-  // Solve the system.
-  CHECK_EQ(cusolverDnXpotrs(cusolver_handle_,
-                            nullptr,
-                            CUBLAS_FILL_MODE_LOWER,
-                            num_cols_,
-                            1,
-                            CUDA_R_64F,
-                            gpu_a_,
-                            num_cols_,
-                            CUDA_R_64F,
-                            gpu_b_,
-                            num_cols_,
-                            gpu_error_),
-           CUSOLVER_STATUS_SUCCESS);
-  CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
-  CHECK_EQ(cudaStreamSynchronize(stream_), cudaSuccess);
+  {
+    ScopedExecutionTimer timer("MemcpyHostToGPU", &execution_summary_);
+    // Copy B to GPU.
+    CHECK_EQ(cudaMemcpy(gpu_b_,
+                        B,
+                        num_cols_ * sizeof(double),
+                        cudaMemcpyHostToDevice),
+            cudaSuccess);
+  }
+  {
+    ScopedExecutionTimer timer("potrs", &execution_summary_);
+    // Solve the system.
+    CHECK_EQ(cusolverDnXpotrs(cusolver_handle_,
+                              nullptr,
+                              CUBLAS_FILL_MODE_LOWER,
+                              num_cols_,
+                              1,
+                              CUDA_R_64F,
+                              gpu_a_,
+                              num_cols_,
+                              CUDA_R_64F,
+                              gpu_b_,
+                              num_cols_,
+                              gpu_error_),
+            CUSOLVER_STATUS_SUCCESS);
+    CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
+    CHECK_EQ(cudaStreamSynchronize(stream_), cudaSuccess);
+  }
   // Check for errors.
   int error = 0;
-  CHECK_EQ(cudaMemcpy(&error,
-                      gpu_error_,
-                      sizeof(int),
-                      cudaMemcpyDeviceToHost),
-           cudaSuccess);
+  {
+    ScopedExecutionTimer timer("MemcpyGPUToHost", &execution_summary_);
+    // Copy error variable from GPU to host.
+    CHECK_EQ(cudaMemcpy(&error,
+                        gpu_error_,
+                        sizeof(int),
+                        cudaMemcpyDeviceToHost),
+            cudaSuccess);
+    // Copy X from GPU to host.
+    CHECK_EQ(cudaMemcpy(X,
+                        gpu_b_,
+                        num_cols_ * sizeof(double),
+                        cudaMemcpyDeviceToHost),
+            cudaSuccess);
+  }
   if (error != 0) {
     *message = "cuSOLVER Cholesky solve failed.";
     return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
   }
-  // Copy X from GPU to host.
-  CHECK_EQ(cudaMemcpy(X,
-                      gpu_b_,
-                      num_cols_ * sizeof(double),
-                      cudaMemcpyDeviceToHost),
-           cudaSuccess);
   return LinearSolverTerminationType::LINEAR_SOLVER_SUCCESS;
 }
 

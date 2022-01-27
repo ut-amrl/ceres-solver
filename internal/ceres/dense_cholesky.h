@@ -40,7 +40,9 @@
 
 #include "Eigen/Dense"
 #include "ceres/dense_cuda_solver.h"
+#include "ceres/execution_summary.h"
 #include "ceres/linear_solver.h"
+#include "ceres/map_util.h"
 #include "glog/logging.h"
 
 namespace ceres {
@@ -93,11 +95,16 @@ class CERES_EXPORT_INTERNAL DenseCholesky {
                                              const double* rhs,
                                              double* solution,
                                              std::string* message);
+
+  // Execution summary used to track the contribution of different operations,
+  // e.g. memory allocation, transfers, solver calls, etc. to the total
+  // run time.
+  ExecutionSummary execution_summary_;
 };
 
 class CERES_EXPORT_INTERNAL EigenDenseCholesky : public DenseCholesky {
  public:
-  ~EigenDenseCholesky() override = default;
+  ~EigenDenseCholesky() override;
 
   LinearSolverTerminationType Factorize(int num_cols,
                                         double* lhs,
@@ -114,7 +121,7 @@ class CERES_EXPORT_INTERNAL EigenDenseCholesky : public DenseCholesky {
 #ifndef CERES_NO_LAPACK
 class CERES_EXPORT_INTERNAL LAPACKDenseCholesky : public DenseCholesky {
  public:
-  ~LAPACKDenseCholesky() override = default;
+  ~LAPACKDenseCholesky() override;
 
   LinearSolverTerminationType Factorize(int num_cols,
                                         double* lhs,

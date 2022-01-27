@@ -37,6 +37,7 @@
 
 #include <string>
 
+#include "ceres/execution_summary.h"
 #include "ceres/linear_solver.h"
 
 #include "cusolverDn.h"
@@ -95,6 +96,10 @@ class DenseCudaSolver {
   size_t host_scratch_size_;
   // Required for error handling with cuSOLVER.
   int* gpu_error_;
+  // Execution summary used to track the contribution of different operations,
+  // e.g. CUDA allocation, memory transfers, cuSOLVER calls, etc. to the total
+  // run time.
+  ExecutionSummary execution_summary_;
 };
 
 
