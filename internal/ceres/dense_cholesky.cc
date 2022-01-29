@@ -131,7 +131,7 @@ LinearSolverTerminationType EigenDenseCholesky::Solve(const double* rhs,
 }
 
 EigenDenseCholesky::~EigenDenseCholesky() {
-  if (true) {
+  if (FLAGS_v > 0) {
     printf("EigenDenseCholesky:\n");
     execution_summary_.Print("Factorize");
     execution_summary_.Print("Solve");
@@ -141,7 +141,7 @@ EigenDenseCholesky::~EigenDenseCholesky() {
 #ifndef CERES_NO_LAPACK
 
 LAPACKDenseCholesky::~LAPACKDenseCholesky() {
-  if (true) {
+  if (FLAGS_v > 0) {
     printf("LAPACKDenseCholesky:\n");
     execution_summary_.Print("Factorize");
     execution_summary_.Print("Solve");

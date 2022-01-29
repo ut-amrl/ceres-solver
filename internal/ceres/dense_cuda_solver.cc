@@ -92,7 +92,7 @@ DenseCudaSolver::~DenseCudaSolver() {
   }
   CHECK_EQ(cusolverDnDestroy(cusolver_handle_), CUSOLVER_STATUS_SUCCESS);
   CHECK_EQ(cudaStreamDestroy(stream_), cudaSuccess);
-  if (true) {
+  if (FLAGS_v > 0) {
     printf("DenseCudaSolver:\n");
     execution_summary_.Print("AllocateGPUMemory");
     execution_summary_.Print("MemcpyHostToGPU");

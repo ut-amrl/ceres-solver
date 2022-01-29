@@ -223,7 +223,7 @@ LinearSolver::Summary DenseSchurComplementSolver::SolveReducedLinearSystem(
 }
 
 DenseSchurComplementSolver::~DenseSchurComplementSolver() {
-  if (true) {
+  if (FLAGS_v > 0) {
     printf("DenseSchurComplementSolver:\n");
     execution_summary_.Print("Eliminate");
     execution_summary_.Print("SolveReducedLinearSystem");
@@ -239,7 +239,15 @@ SparseSchurComplementSolver::SparseSchurComplementSolver(
   }
 }
 
-SparseSchurComplementSolver::~SparseSchurComplementSolver() {}
+SparseSchurComplementSolver::~SparseSchurComplementSolver() {
+  if (FLAGS_v > 0) {
+    printf("SparseSchurComplementSolver:\n");
+    execution_summary_.Print("Eliminate");
+    execution_summary_.Print("SolveReducedLinearSystem");
+    execution_summary_.Print("SolveCG");
+    execution_summary_.Print("BackSubstitute");
+  }
+}
 
 // Determine the non-zero blocks in the Schur Complement matrix, and
 // initialize a BlockRandomAccessSparseMatrix object.
@@ -314,6 +322,7 @@ void SparseSchurComplementSolver::InitStorage(
 
 LinearSolver::Summary SparseSchurComplementSolver::SolveReducedLinearSystem(
     const LinearSolver::PerSolveOptions& per_solve_options, double* solution) {
+  ScopedExecutionTimer timer("SolveReducedLinearSystem", &execution_summary_);
   if (options().type == ITERATIVE_SCHUR) {
     return SolveReducedLinearSystemUsingConjugateGradients(per_solve_options,
                                                            solution);
@@ -354,6 +363,7 @@ LinearSolver::Summary SparseSchurComplementSolver::SolveReducedLinearSystem(
 LinearSolver::Summary
 SparseSchurComplementSolver::SolveReducedLinearSystemUsingConjugateGradients(
     const LinearSolver::PerSolveOptions& per_solve_options, double* solution) {
+  ScopedExecutionTimer timer("SolveCG", &execution_summary_);
   CHECK(options().use_explicit_schur_complement);
   const int num_rows = lhs()->num_rows();
   // The case where there are no f blocks, and the system is block
