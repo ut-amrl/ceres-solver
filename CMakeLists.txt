@@ -264,7 +264,10 @@ endif (Eigen3_FOUND)
 if (CUDA)
   find_package(CUDA QUIET)
   if (CUDA_FOUND)
-    message("-- Found CUDA library: ${CUDA_LIBRARIES}")
+    message("-- Found CUDA version ${CUDA_VERSION}: "
+        "${CUDA_LIBRARIES};"
+        "${CUDA_cusolver_LIBRARY};"
+        "${CUDA_cusparse_LIBRARY}")
     include_directories(${CUDA_INCLUDE_DIRS})
   else (CUDA_FOUND)
     message("-- Did not find CUDA library, disabling CUDA support.")
