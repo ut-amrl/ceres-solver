@@ -39,7 +39,8 @@
 #include "glog/logging.h"
 
 template <typename T>
-struct CudaBuffer {
+class CudaBuffer {
+ public:
   CudaBuffer() : data_(nullptr), size_(0) {}
   CudaBuffer(const CudaBuffer&) = delete;
   CudaBuffer& operator=(const CudaBuffer&) = delete;
@@ -83,7 +84,9 @@ struct CudaBuffer {
   }
 
   T* data() { return data_; }
+  size_t size() const { return size_; }
 
+ private:
   T* data_;
   size_t size_;
 };

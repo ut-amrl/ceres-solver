@@ -37,6 +37,7 @@
 
 #include <string>
 
+#include "ceres/cuda_helpers.h"
 #include "ceres/execution_summary.h"
 #include "ceres/linear_solver.h"
 
@@ -65,10 +66,6 @@ class DenseCudaSolver {
                                             double* X,
                                             std::string* message);
 
-  // Make sure that there is sufficient memory allocated on the GPU for the
-  // given sized problem.
-  void AllocateGPUMemory(size_t num_cols);
-
  private:
   // Handle to the cuSOLVER context.
   cusolverDnHandle_t cusolver_handle_;
@@ -77,19 +74,12 @@ class DenseCudaSolver {
   // Number of columns in the A matrix, to be cached between calls to *Factorize
   // and *Solve.
   size_t num_cols_;
-  // Pointer to GPU memory allocated for the A matrix (lhs matrix).
-  double* gpu_a_;
-  // Pointer to GPU memory allocated for the B matrix (rhs vector).
-  double* gpu_b_;
-  // The largest number of columns asked to solve previously -- this is used to
-  // keep track of the amount of GPU memory allocated so far:
-  // gpu_a_ = double[max_num_cols_ * max_num_cols_]
-  // gpu_b_ = double[max_num_cols_]
-  size_t max_num_cols_;
+  // GPU memory allocated for the A matrix (lhs matrix).
+  CudaBuffer<double> gpu_a_;
+  // GPU memory allocated for the B matrix (rhs vector).
+  CudaBuffer<double> gpu_b_;
   // Scratch space for cuSOLVER on the GPU.
-  void* gpu_scratch_;
-  // Size of the GPU scratch space.
-  size_t gpu_scratch_size_;
+  CudaBuffer<uint8_t> gpu_scratch_;
   // Scratch space for cuSOLVER on the host.
   double* host_scratch_;
   // Size of the host scratch space.
