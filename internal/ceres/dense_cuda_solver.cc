@@ -138,8 +138,8 @@ LinearSolverTerminationType DenseCudaSolver::CholeskyFactorize(
                               num_cols,
                               gpu_a_.data(),
                               num_cols,
-                              reinterpret_cast<double*>(gpu_scratch_),
-                              gpu_scratch_size_,
+                              reinterpret_cast<double*>(gpu_scratch_.data()),
+                              gpu_scratch_.size(),
                               gpu_error_),
             CUSOLVER_STATUS_SUCCESS);
 #else  // CUDA_PRE_11_1
@@ -197,7 +197,7 @@ LinearSolverTerminationType DenseCudaSolver::CholeskySolve(
                               1,
                               gpu_a_.data(),
                               num_cols_,
-                              gpu_b_,
+                              gpu_b_.data(),
                               num_cols_,
                               gpu_error_),
             CUSOLVER_STATUS_SUCCESS);
