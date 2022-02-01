@@ -132,8 +132,21 @@ LinearSolverTerminationType DenseCudaSolver::CholeskyFactorize(
 
   {
     ScopedExecutionTimer timer("potrf", &execution_summary_);
-    size_t device_scratch_size = 0;
+
+#ifdef CUDA_PRE_11_1
+    // CUDA < 11.1 did not have the 64-bit APIs, so use the legacy versions.
+    int device_scratch_size = 0;
+    CHECK_EQ(cusolverDnDpotrf_bufferSize(cusolver_handle_,
+                                        CUBLAS_FILL_MODE_LOWER,
+                                        num_cols,
+                                        gpu_a_,
+                                        num_cols,
+                                        &device_scratch_size),
+            CUSOLVER_STATUS_SUCCESS);
+#else  // CUDA_PRE_11_1
     size_t host_scratch_size = 0;
+    size_t device_scratch_size = 0;
+
     CHECK_EQ(cusolverDnXpotrf_bufferSize(cusolver_handle_,
                                         nullptr,
                                         CUBLAS_FILL_MODE_LOWER,
@@ -145,18 +158,32 @@ LinearSolverTerminationType DenseCudaSolver::CholeskyFactorize(
                                         &device_scratch_size,
                                         &host_scratch_size),
             CUSOLVER_STATUS_SUCCESS);
-
-    // ALlocate GPU scratch memory.
-    CudaRealloc(reinterpret_cast<void**>(&gpu_scratch_), device_scratch_size);
-    gpu_scratch_size_ = std::max(gpu_scratch_size_, device_scratch_size);
-
     // Allocate host scratch memory.
     if (host_scratch_size > host_scratch_size_) {
       CHECK_NOTNULL(realloc(
           reinterpret_cast<void**>(&host_scratch_), host_scratch_size));
       host_scratch_size_ = host_scratch_size;
     }
+#endif  // CUDA_PRE_11_1
+    // ALlocate GPU scratch memory.
+    CudaRealloc(reinterpret_cast<void**>(&gpu_scratch_), device_scratch_size);
+    gpu_scratch_size_ =
+        std::max<size_t>(gpu_scratch_size_, device_scratch_size);
 
+
+#ifdef CUDA_PRE_11_1
+    // CUDA < 11.1 did not have the 64-bit APIs, so use the legacy versions.
+
+    CHECK_EQ(cusolverDnDpotrf(cusolver_handle_,
+                              CUBLAS_FILL_MODE_LOWER,
+                              num_cols,
+                              gpu_a_,
+                              num_cols,
+                              reinterpret_cast<double*>(gpu_scratch_),
+                              gpu_scratch_size_,
+                              gpu_error_),
+            CUSOLVER_STATUS_SUCCESS);
+#else  // CUDA_PRE_11_1
     // Perform Cholesky factorization.
     CHECK_EQ(cusolverDnXpotrf(cusolver_handle_,
                               nullptr,
@@ -172,6 +199,7 @@ LinearSolverTerminationType DenseCudaSolver::CholeskyFactorize(
                               host_scratch_size_,
                               gpu_error_),
             CUSOLVER_STATUS_SUCCESS);
+#endif  // CUDA_PRE_11_1
     CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
     CHECK_EQ(cudaStreamSynchronize(stream_), cudaSuccess);
   }
@@ -208,6 +236,19 @@ LinearSolverTerminationType DenseCudaSolver::CholeskySolve(
   {
     ScopedExecutionTimer timer("potrs", &execution_summary_);
     // Solve the system.
+
+#ifdef CUDA_PRE_11_1
+    CHECK_EQ(cusolverDnDpotrs(cusolver_handle_,
+                              CUBLAS_FILL_MODE_LOWER,
+                              num_cols_,
+                              1,
+                              gpu_a_,
+                              num_cols_,
+                              gpu_b_,
+                              num_cols_,
+                              gpu_error_),
+            CUSOLVER_STATUS_SUCCESS);
+#else  // CUDA_PRE_11_1
     CHECK_EQ(cusolverDnXpotrs(cusolver_handle_,
                               nullptr,
                               CUBLAS_FILL_MODE_LOWER,
@@ -223,6 +264,7 @@ LinearSolverTerminationType DenseCudaSolver::CholeskySolve(
             CUSOLVER_STATUS_SUCCESS);
     CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
     CHECK_EQ(cudaStreamSynchronize(stream_), cudaSuccess);
+#endif  // CUDA_PRE_11_1
   }
   // Check for errors.
   int error = 0;

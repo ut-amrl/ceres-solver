@@ -268,6 +268,11 @@ if (CUDA)
         "${CUDA_LIBRARIES};"
         "${CUDA_cusolver_LIBRARY};"
         "${CUDA_cusparse_LIBRARY}")
+    if (CUDA_VERSION VERSION_LESS 11.1)
+      message("-- CUDA version ${CUDA_VERSION} is older than 11.1, "
+          "switching to legacy mode.")
+      add_definitions(-DCUDA_PRE_11_1)
+    endif()
     include_directories(${CUDA_INCLUDE_DIRS})
   else (CUDA_FOUND)
     message("-- Did not find CUDA library, disabling CUDA support.")
