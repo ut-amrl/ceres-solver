@@ -36,7 +36,9 @@
 #include "ceres/internal/config.h"
 #include "ceres/internal/port.h"
 #include "ceres/version.h"
+#ifndef CERES_NO_CUDA
 #include "cuda_runtime.h"
+#endif  // CERES_NO_CUDA
 
 namespace ceres {
 namespace internal {

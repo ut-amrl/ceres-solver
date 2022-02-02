@@ -33,7 +33,9 @@
 #ifndef INTERNAL_CERES_DENSE_CUDA_SOLVER_H_
 #define INTERNAL_CERES_DENSE_CUDA_SOLVER_H_
 
-#ifndef CERES_NO_CUDASOLVER
+#include "ceres/internal/config.h"
+
+#ifndef CERES_NO_CUDA
 
 #include <string>
 
@@ -116,6 +118,6 @@ class DenseCudaSolver {
 }  // namespace internal
 }  // namespace ceres
 
-#endif  // CERES_NO_CUDASOLVER
+#endif  // CERES_NO_CUDA
 
 #endif  // INTERNAL_CERES_DENSE_CUDA_SOLVER_H_

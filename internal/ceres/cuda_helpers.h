@@ -31,6 +31,8 @@
 #ifndef CERES_INTERNAL_CUDA_HELPERS_H_
 #define CERES_INTERNAL_CUDA_HELPERS_H_
 
+#include "ceres/internal/config.h"
+
 #ifndef CERES_NO_CUDA
 
 #include <vector>

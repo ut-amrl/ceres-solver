@@ -31,6 +31,8 @@
 #ifndef CERES_INTERNAL_CUDA_SPARSE_H_
 #define CERES_INTERNAL_CUDA_SPARSE_H_
 
+#include "ceres/internal/config.h"
+
 #ifndef CERES_NO_CUDA
 
 #include <memory>
@@ -87,14 +89,6 @@ class CudaSparseCholesky : public SparseCholesky {
 }  // namespace internal
 }  // namespace ceres
 
-#else
-
-typedef void cs_dis;
-
-class CXSparse {
- public:
-  void Free(void* arg) {}
-};
 #endif  // CERES_NO_CUDA
 
 #endif  // CERES_INTERNAL_CUDA_SPARSE_H_

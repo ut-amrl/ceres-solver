@@ -28,6 +28,8 @@
 //
 // Author: joydeepb@cs.utexas.edu (Joydeep Biswas)
 
+#include "ceres/internal/config.h"
+
 #ifndef CERES_NO_CUDA
 
 #include <memory>

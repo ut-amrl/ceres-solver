@@ -30,7 +30,9 @@
 //
 // A C++ interface to dense CUDA solvers.
 
-#ifndef CERES_NO_CUDASOLVER
+#include "ceres/internal/config.h"
+
+#ifndef CERES_NO_CUDA
 
 #include <cstring>
 #include <string>
@@ -352,4 +354,4 @@ LinearSolverTerminationType DenseCudaSolver::QRSolve(const double* B,
 }  // namespace internal
 }  // namespace ceres
 
-#endif  // CERES_NO_CUDASOLVER
+#endif  // CERES_NO_CUDA
