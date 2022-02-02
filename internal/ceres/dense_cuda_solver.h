@@ -61,16 +61,34 @@ class DenseCudaSolver {
 
   // Solve the linear system A * X = B, using the previously computed Cholesky
   // factorization of A. The user must ensure that CholeskyFactorize() has been
-  // called before calling this method.
+  // called before calling this method. The number of rows in B and X must be
+  // equal to the number of columns (and rows) in A.
   LinearSolverTerminationType CholeskySolve(const double* B,
                                             double* X,
                                             std::string* message);
+
+  // Perform QR factorization of a matrix A.
+  LinearSolverTerminationType QRFactorize(int num_cols,
+                                          int num_rows,
+                                          double* A,
+                                          std::string* message);
+
+  // Solve the linear system A * X = B, using the previously computed QR
+  // factorization of A. The user must ensure that QRFactorize() has been
+  // called before calling this method.  The number of rows in B and X must be
+  // equal to the number of columns in A.
+  LinearSolverTerminationType QRSolve(const double* B,
+                                      double* X,
+                                      std::string* message);
 
  private:
   // Handle to the cuSOLVER context.
   cusolverDnHandle_t cusolver_handle_;
   // CUDA device stream.
   cudaStream_t stream_;
+  // Number of rows in the A matrix, to be cached between calls to *Factorize
+  // and *Solve.
+  size_t num_rows_;
   // Number of columns in the A matrix, to be cached between calls to *Factorize
   // and *Solve.
   size_t num_cols_;
@@ -78,6 +96,8 @@ class DenseCudaSolver {
   CudaBuffer<double> gpu_a_;
   // GPU memory allocated for the B matrix (rhs vector).
   CudaBuffer<double> gpu_b_;
+  // GPU memory allocated for the X matrix (solution vector).
+  CudaBuffer<double> gpu_tau_;
   // Scratch space for cuSOLVER on the GPU.
   CudaBuffer<uint8_t> gpu_scratch_;
   // Scratch space for cuSOLVER on the host.
