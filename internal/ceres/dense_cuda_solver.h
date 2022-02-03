@@ -86,6 +86,8 @@ class DenseCudaSolver {
  private:
   // Handle to the cuSOLVER context.
   cusolverDnHandle_t cusolver_handle_;
+  // Handle to the cuBLAS context.
+  cublasHandle_t cublas_handle_;
   // CUDA device stream.
   cudaStream_t stream_;
   // Number of rows in the A matrix, to be cached between calls to *Factorize

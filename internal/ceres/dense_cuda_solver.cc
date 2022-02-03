@@ -43,6 +43,7 @@
 #include "ceres/linear_solver.h"
 #include "ceres/map_util.h"
 
+#include "cublas_v2.h"
 #include "cuda_runtime.h"
 #include "cusolverDn.h"
 #include "glog/logging.h"
@@ -53,12 +54,14 @@ namespace internal {
 
 DenseCudaSolver::DenseCudaSolver() :
     cusolver_handle_(nullptr),
+    cublas_handle_(nullptr),
     stream_(nullptr),
     num_rows_(0),
     num_cols_(0),
     host_scratch_(nullptr),
     host_scratch_size_(0),
     gpu_error_(nullptr) {
+  CHECK_EQ(cublasCreate(&cublas_handle_), CUBLAS_STATUS_SUCCESS);
   CHECK_EQ(cusolverDnCreate(&cusolver_handle_), CUSOLVER_STATUS_SUCCESS);
   CHECK_EQ(cudaStreamCreate(&stream_), cudaSuccess);
   CHECK_EQ(cusolverDnSetStream(cusolver_handle_, stream_),
@@ -246,8 +249,8 @@ LinearSolverTerminationType DenseCudaSolver::CholeskySolve(
   return LinearSolverTerminationType::LINEAR_SOLVER_SUCCESS;
 }
 
-LinearSolverTerminationType DenseCudaSolver::QRFactorize(int num_cols,
-                                                         int num_rows,
+LinearSolverTerminationType DenseCudaSolver::QRFactorize(int num_rows,
+                                                         int num_cols,
                                                          double* A,
                                                          std::string* message) {
   {
@@ -348,6 +351,71 @@ LinearSolverTerminationType DenseCudaSolver::QRFactorize(int num_cols,
 LinearSolverTerminationType DenseCudaSolver::QRSolve(const double* B,
                                                      double* X,
                                                      std::string* message) {
+  {
+    ScopedExecutionTimer timer("AllocateGPUMemory", &execution_summary_);
+    gpu_b_.Reserve(num_rows_);
+  }
+  {
+    ScopedExecutionTimer timer("MemcpyHostToGPU", &execution_summary_);
+    gpu_b_.CopyToGpu(B, num_rows_);
+  }
+  {
+    // Compute Q^T * B.
+    ScopedExecutionTimer timer("ormqr", &execution_summary_);
+    int gpu_scratch_size = 0;
+    CHECK_EQ(cusolverDnDormqr_bufferSize(cusolver_handle_,
+                                        CUBLAS_SIDE_LEFT,
+                                        CUBLAS_OP_T,
+                                        num_rows_,
+                                        1,
+                                        num_cols_,
+                                        gpu_a_.data(),
+                                        num_rows_,
+                                        gpu_tau_.data(),
+                                        gpu_b_.data(),
+                                        num_rows_,
+                                        &gpu_scratch_size),
+        CUSOLVER_STATUS_SUCCESS);
+    gpu_scratch_.Reserve(gpu_scratch_size);
+    CHECK_EQ(cusolverDnDormqr(cusolver_handle_,
+                              CUBLAS_SIDE_LEFT,
+                              CUBLAS_OP_T,
+                              num_rows_,
+                              1,
+                              num_cols_,
+                              gpu_a_.data(),
+                              num_rows_,
+                              gpu_tau_.data(),
+                              gpu_b_.data(),
+                              num_rows_,
+                              reinterpret_cast<double*>(gpu_scratch_.data()),
+                              gpu_scratch_.size(),
+                              gpu_error_),
+              CUSOLVER_STATUS_SUCCESS);
+  }
+  {
+    // Compute R \ Q^T * B.
+    const double one = 1.0;
+    ScopedExecutionTimer timer("trsm", &execution_summary_);
+    CHECK_EQ(cublasDtrsm(cublas_handle_,
+                         CUBLAS_SIDE_LEFT,
+                         CUBLAS_FILL_MODE_UPPER,
+                         CUBLAS_OP_N,
+                         CUBLAS_DIAG_NON_UNIT,
+                         num_rows_,
+                         1,
+                         &one,
+                         gpu_a_.data(),
+                         num_rows_,
+                         gpu_b_.data(),
+                         num_rows_),
+            CUBLAS_STATUS_SUCCESS);
+  }
+  {
+    ScopedExecutionTimer timer("MemcpyGPUToHost", &execution_summary_);
+    // Copy the result back to the host.
+    gpu_b_.CopyToHost(X, num_rows_);
+  }
   return LinearSolverTerminationType::LINEAR_SOLVER_SUCCESS;
 }
 

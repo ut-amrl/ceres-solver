@@ -41,6 +41,10 @@ using std::cout;
 using std::endl;
 using std::string;
 
+namespace {
+const double kTolerance = 1e-10;
+}  // namespace
+
 namespace ceres {
 namespace internal {
 
@@ -65,6 +69,30 @@ TEST(DenseCholeskyCudaSolver, Cholesky4x4Matrix) {
   EXPECT_DOUBLE_EQ(x(1), -31.0 / 3.0);
   EXPECT_DOUBLE_EQ(x(2), 5.0 / 3.0);
   EXPECT_DOUBLE_EQ(x(3), 1.0000);
+}
+
+// Tests the CUDA QR solver with a simple 4x4 matrix.
+TEST(DenseQrCudaSolver, Qr4x4Matrix) {
+  Eigen::Matrix4d A;
+  A <<  4,  12, -16, 0,
+       12,  37, -43, 0,
+      -16, -43,  98, 0,
+        0,   0,   0, 1;
+  const Eigen::Vector4d b = Eigen::Vector4d::Ones();
+  string error_string;
+  DenseCudaSolver dense_cuda_solver;
+  ASSERT_EQ(dense_cuda_solver.QRFactorize(A.rows(),
+                                          A.cols(),
+                                          A.data(),
+                                          &error_string),
+            LinearSolverTerminationType::LINEAR_SOLVER_SUCCESS);
+  Eigen::Vector4d x = Eigen::Vector4d::Zero();
+  ASSERT_EQ(dense_cuda_solver.QRSolve(b.data(), x.data(), &error_string),
+            LinearSolverTerminationType::LINEAR_SOLVER_SUCCESS);
+  EXPECT_NEAR(x(0), 113.75 / 3.0, kTolerance);
+  EXPECT_NEAR(x(1), -31.0 / 3.0, kTolerance);
+  EXPECT_NEAR(x(2), 5.0 / 3.0, kTolerance);
+  EXPECT_NEAR(x(3), 1.0000, kTolerance);
 }
 
 }  // namespace internal

@@ -225,7 +225,8 @@ if (CUDA_FOUND)
        CERES_LIBRARY_PUBLIC_DEPENDENCIES
        ${CUDA_LIBRARIES}
        ${CUDA_cusolver_LIBRARY}
-       ${CUDA_cusparse_LIBRARY})
+       ${CUDA_cusparse_LIBRARY}
+       ${CUDA_cublas_LIBRARY})
 endif (CUDA_FOUND)
 
 if (LAPACK_FOUND)
