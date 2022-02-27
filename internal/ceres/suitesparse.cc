@@ -363,6 +363,11 @@ SuiteSparseCholesky::~SuiteSparseCholesky() {
   if (factor_ != nullptr) {
     ss_.Free(factor_);
   }
+
+  printf("SuiteSparseCholesky:\n");
+  execution_summary_.Print("SymbolicAnalysis");
+  execution_summary_.Print("Factorize");
+  execution_summary_.Print("Solve");
 }
 
 LinearSolverTerminationType SuiteSparseCholesky::Factorize(
@@ -375,6 +380,7 @@ LinearSolverTerminationType SuiteSparseCholesky::Factorize(
   cholmod_sparse cholmod_lhs = ss_.CreateSparseMatrixTransposeView(lhs);
 
   if (factor_ == nullptr) {
+    ScopedExecutionTimer timer("SymbolicAnalysis", &execution_summary_);
     if (ordering_type_ == NATURAL) {
       factor_ = ss_.AnalyzeCholeskyWithNaturalOrdering(&cholmod_lhs, message);
     } else {
@@ -390,6 +396,7 @@ LinearSolverTerminationType SuiteSparseCholesky::Factorize(
       return LINEAR_SOLVER_FATAL_ERROR;
     }
   }
+  ScopedExecutionTimer timer("Factorize", &execution_summary_);
 
   return ss_.Cholesky(&cholmod_lhs, factor_, message);
 }
@@ -410,6 +417,7 @@ LinearSolverTerminationType SuiteSparseCholesky::Solve(const double* rhs,
     return LINEAR_SOLVER_FATAL_ERROR;
   }
 
+  ScopedExecutionTimer timer("Solve", &execution_summary_);
   const int num_cols = factor_->n;
   cholmod_dense cholmod_rhs = ss_.CreateDenseVectorView(rhs, num_cols);
   cholmod_dense* cholmod_dense_solution =

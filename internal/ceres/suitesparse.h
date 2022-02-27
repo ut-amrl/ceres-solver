@@ -307,6 +307,8 @@ class SuiteSparseCholesky : public SparseCholesky {
   const OrderingType ordering_type_;
   SuiteSparse ss_;
   cholmod_factor* factor_;
+  // Execution summary.
+  ExecutionSummary execution_summary_;
 };
 
 }  // namespace internal

@@ -141,7 +141,7 @@ LinearSolverTerminationType CudaSparseCholesky::Solve(const double* rhs,
                                   cuda_lhs_csr_cols_.data(),
                                   cuda_rhs_.data(),
                                   0,
-                                  0,
+                                  2,
                                   cuda_solution_.data(),
                                   &singularity),
         CUSOLVER_STATUS_SUCCESS);
