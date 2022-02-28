@@ -103,6 +103,54 @@ TEST_P(DenseQRTest, FactorAndSolve) {
   }
 }
 
+TEST_P(DenseQRTest, RandomizedIncreasingMatrixSizesTests) {
+  const int kMinNumCols = 4;
+  const int kMaxNumCols = 400;
+  const int kRowsToColsRatio = 4;
+
+  using LhsType = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
+  using RhsType = Eigen::Matrix<double, Eigen::Dynamic, 1>;
+  using SolutionType = Eigen::Matrix<double, Eigen::Dynamic, 1>;
+
+  LinearSolver::Options options;
+  ContextImpl context;
+  options.context = &context;
+  options.dense_linear_algebra_library_type = GetParam();
+  std::unique_ptr<DenseQR> dense_qr = DenseQR::Create(options);
+
+  for (int num_cols = kMinNumCols; num_cols <= kMaxNumCols; num_cols += 4) {
+    const int num_rows = num_cols * kRowsToColsRatio;
+    LhsType lhs = LhsType::Random(num_rows, num_cols);
+    SolutionType x_expected = SolutionType::Random(num_cols);
+    RhsType rhs = lhs * x_expected;
+    SolutionType x_computed = SolutionType::Zero(num_cols);
+    // Sanity check the random matrix sizes.
+    EXPECT_EQ(lhs.rows(), num_rows);
+    EXPECT_EQ(lhs.cols(), num_cols);
+    EXPECT_EQ(rhs.rows(), num_rows);
+    EXPECT_EQ(rhs.cols(), 1);
+    EXPECT_EQ(x_expected.rows(), num_cols);
+    EXPECT_EQ(x_expected.cols(), 1);
+    EXPECT_EQ(x_computed.rows(), num_cols);
+    EXPECT_EQ(x_computed.cols(), 1);
+    LinearSolver::Summary summary;
+    summary.termination_type = dense_qr->FactorAndSolve(num_rows,
+                                                        num_cols,
+                                                        lhs.data(),
+                                                        rhs.data(),
+                                                        x_computed.data(),
+                                                        &summary.message);
+    ASSERT_EQ(summary.termination_type, LINEAR_SOLVER_SUCCESS)
+        << "Failed with matrix of size " << num_rows << "x" << num_cols
+        << " matrix and message " << summary.message;
+    ASSERT_NEAR((x_computed - x_expected).norm() / x_expected.norm(),
+                0.0,
+                std::numeric_limits<double>::epsilon() * 400)
+                << "Failed with matrix of size "
+                << num_rows << "x" << num_cols;
+  }
+}
+
 namespace {
 
 // NOTE: preprocessor directives in a macro are not standard conforming

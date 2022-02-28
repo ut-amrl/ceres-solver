@@ -31,6 +31,8 @@
 #include "ceres/dense_qr.h"
 
 #include <algorithm>
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <string>
 #ifndef CERES_NO_CUDA
@@ -323,6 +325,17 @@ bool CUDADenseQR::Init(ContextImpl* context, std::string* message) {
   return true;
 }
 
+void SaveMatrixToFile(const double* x, int num_rows, int num_cols, const std::string& filename) {
+  std::ofstream outfile(filename);
+  for (int i = 0; i < num_rows; ++i) {
+    for (int j = 0; j < num_cols; ++j) {
+      outfile << x[j * num_rows + i] << " ";
+    }
+    outfile << std::endl;
+  }
+  outfile.close();
+}
+
 LinearSolverTerminationType CUDADenseQR::Factorize(
     int num_rows, int num_cols, double* lhs, std::string* message) {
   factorize_result_ = LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
@@ -331,6 +344,8 @@ LinearSolverTerminationType CUDADenseQR::Factorize(
   num_rows_ = num_rows;
   num_cols_ = num_cols;
   lhs_.CopyToGpuAsync(lhs, num_rows * num_cols, stream_);
+  SaveMatrixToFile(lhs, num_rows, num_cols, "lhs.txt");
+  std::vector<double> lhs_cpu(num_cols * num_rows);
   int device_workspace_size = 0;
   if (cusolverDnDgeqrf_bufferSize(cusolver_handle_,
                                   num_rows,
@@ -372,6 +387,8 @@ LinearSolverTerminationType CUDADenseQR::Factorize(
     return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
   }
 
+  lhs_.CopyToHost(lhs_cpu.data(), num_rows * num_cols);
+  SaveMatrixToFile(lhs_cpu.data(), num_rows, num_cols, "qr.txt");
   *message = "Success";
   factorize_result_ = LinearSolverTerminationType::LINEAR_SOLVER_SUCCESS;
   return LinearSolverTerminationType::LINEAR_SOLVER_SUCCESS;
@@ -383,7 +400,14 @@ LinearSolverTerminationType CUDADenseQR::Solve(
     *message = "Factorize did not complete succesfully previously.";
     return factorize_result_;
   }
+  SaveMatrixToFile(rhs, num_rows_, 1, "rhs.txt");
   rhs_.CopyToGpuAsync(rhs, num_rows_, stream_);
+  if (cudaDeviceSynchronize() != cudaSuccess ||
+      cudaStreamSynchronize(stream_) != cudaSuccess) {
+    *message = "Cuda device synchronization failed.";
+    return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
+  }
+  std::vector<double> rhs_cpu(num_rows_);
   int device_workspace_size = 0;
   if (cusolverDnDormqr_bufferSize(cusolver_handle_,
                                   CUBLAS_SIDE_LEFT,
@@ -421,14 +445,44 @@ LinearSolverTerminationType CUDADenseQR::Solve(
     *message = "cuSolverDN::cusolverDnDormqr failed.";
     return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
   }
+  if (cudaDeviceSynchronize() != cudaSuccess ||
+      cudaStreamSynchronize(stream_) != cudaSuccess) {
+    *message = "Cuda device synchronization failed.";
+    return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
+  }
+  if (cusolverDnDormqr(cusolver_handle_,
+                       CUBLAS_SIDE_LEFT,
+                       CUBLAS_OP_T,
+                       num_rows_,
+                       1,
+                       num_cols_,
+                       lhs_.data(),
+                       num_rows_,
+                       tau_.data(),
+                       rhs_.data(),
+                       num_rows_,
+                       reinterpret_cast<double*>(device_workspace_.data()),
+                       device_workspace_.size(),
+                       error_.data()) != CUSOLVER_STATUS_SUCCESS) {
+    *message = "cuSolverDN::cusolverDnDormqr failed.";
+    return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
+  }
+  if (cudaDeviceSynchronize() != cudaSuccess ||
+      cudaStreamSynchronize(stream_) != cudaSuccess) {
+    *message = "Cuda device synchronization failed.";
+    return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
+  }
   int error = 0;
   error_.CopyToHost(&error, 1);
+  printf("error: %d\n", error);
   if (error < 0) {
     LOG(FATAL) << "Congratulations, you found a bug in Ceres. "
                << "Please report it."
                << "cuSolverDN::cusolverDnDormqr fatal error. "
                << "Argument: " << -error << " is invalid.";
   }
+  rhs_.CopyToHost(&rhs_cpu[0], num_rows_);
+  SaveMatrixToFile(rhs_cpu.data(), num_rows_, 1, "qtrhs.txt");
   // Compute the solution vector as x = R \ (Q^T * rhs). Since the previous step
   // replaced rhs by (Q^T * rhs), this is just x = R \ rhs.
   if (cublasDtrsv(cublas_handle_,
@@ -449,6 +503,7 @@ LinearSolverTerminationType CUDADenseQR::Solve(
     return LinearSolverTerminationType::LINEAR_SOLVER_FATAL_ERROR;
   }
   rhs_.CopyToHost(solution, num_cols_);
+  SaveMatrixToFile(solution, num_cols_, 1, "x.txt");
   *message = "Success";
   return LinearSolverTerminationType::LINEAR_SOLVER_SUCCESS;
 }
