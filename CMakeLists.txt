@@ -48,21 +48,21 @@ ELSE (EXISTS ${CMAKE_SOURCE_DIR}/.git)
   # TODO(keir) Add proper Windows support
 ENDIF (EXISTS ${CMAKE_SOURCE_DIR}/.git)
 
-IF (EXISTS ${LOCAL_GIT_DIRECTORY})
-  IF (NOT EXISTS ${LOCAL_GIT_DIRECTORY}/hooks/commit-msg)
-    # Download the hook only if it is not already present
-    FILE(DOWNLOAD https://ceres-solver-review.googlesource.com/tools/hooks/commit-msg
-         ${CMAKE_BINARY_DIR}/commit-msg)
+# IF (EXISTS ${LOCAL_GIT_DIRECTORY})
+#   IF (NOT EXISTS ${LOCAL_GIT_DIRECTORY}/hooks/commit-msg)
+#     # Download the hook only if it is not already present
+#     FILE(DOWNLOAD https://ceres-solver-review.googlesource.com/tools/hooks/commit-msg
+#          ${CMAKE_BINARY_DIR}/commit-msg)
 
-    # Make the downloaded file executable, since it is not by default.
-    FILE(COPY ${CMAKE_BINARY_DIR}/commit-msg
-         DESTINATION ${LOCAL_GIT_DIRECTORY}/hooks/
-         FILE_PERMISSIONS
-           OWNER_READ OWNER_WRITE OWNER_EXECUTE
-           GROUP_READ GROUP_WRITE GROUP_EXECUTE
-           WORLD_READ WORLD_EXECUTE)
-  ENDIF (NOT EXISTS ${LOCAL_GIT_DIRECTORY}/hooks/commit-msg)
-ENDIF (EXISTS ${LOCAL_GIT_DIRECTORY})
+#     # Make the downloaded file executable, since it is not by default.
+#     FILE(COPY ${CMAKE_BINARY_DIR}/commit-msg
+#          DESTINATION ${LOCAL_GIT_DIRECTORY}/hooks/
+#          FILE_PERMISSIONS
+#            OWNER_READ OWNER_WRITE OWNER_EXECUTE
+#            GROUP_READ GROUP_WRITE GROUP_EXECUTE
+#            WORLD_READ WORLD_EXECUTE)
+#   ENDIF (NOT EXISTS ${LOCAL_GIT_DIRECTORY}/hooks/commit-msg)
+# ENDIF (EXISTS ${LOCAL_GIT_DIRECTORY})
 
 # Make CMake aware of the cmake folder for local FindXXX scripts,
 # append rather than set in case the user has passed their own
