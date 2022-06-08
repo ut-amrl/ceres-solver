@@ -265,7 +265,7 @@ class SchurEliminator : public SchurEliminatorBase {
   // buffer_layout[z2] = y1 * z1 + y1 * z5
   typedef map<int, int> BufferLayoutType;
   struct Chunk {
-    Chunk() : size(0) {}
+    Chunk() : size(0), start(0) {}
     int size;
     int start;
     BufferLayoutType buffer_layout;
