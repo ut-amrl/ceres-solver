@@ -123,13 +123,13 @@ class SchurComplementSolver : public BlockSparseMatrixSolver {
   void set_lhs(BlockRandomAccessMatrix* lhs) { lhs_.reset(lhs); }
   const double* rhs() const { return rhs_.get(); }
   void set_rhs(double* rhs) { rhs_.reset(rhs); }
+  LinearSolver::Options options_;
 
  private:
   virtual void InitStorage(const CompressedRowBlockStructure* bs) = 0;
   virtual LinearSolver::Summary SolveReducedLinearSystem(
       double* solution) = 0;
 
-  LinearSolver::Options options_;
 
   scoped_ptr<SchurEliminatorBase> eliminator_;
   scoped_ptr<BlockRandomAccessMatrix> lhs_;

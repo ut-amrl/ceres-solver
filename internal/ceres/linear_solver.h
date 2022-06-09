@@ -163,6 +163,8 @@ class LinearSolver {
     int row_block_size;
     int e_block_size;
     int f_block_size;
+
+    int jacobian_casting = 0;
   };
 
   // Options for the Solve method.

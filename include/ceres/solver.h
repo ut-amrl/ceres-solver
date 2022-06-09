@@ -712,6 +712,8 @@ class CERES_EXPORT Solver {
     // If non-empty, a summary of the execution of the solver is
     // recorded to this file.
     string solver_log;
+
+    int jacobian_casting = 0;
   };
 
   struct CERES_EXPORT Summary {

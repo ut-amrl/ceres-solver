@@ -1296,8 +1296,9 @@ LinearSolver* SolverImpl::CreateLinearSolver(Solver::Options* options,
   }
 
   LinearSolver::Options linear_solver_options;
+  linear_solver_options.jacobian_casting = options->jacobian_casting;
   linear_solver_options.min_num_iterations =
-        options->min_linear_solver_iterations;
+      options->min_linear_solver_iterations;
   linear_solver_options.max_num_iterations =
       options->max_linear_solver_iterations;
   linear_solver_options.type = options->linear_solver_type;

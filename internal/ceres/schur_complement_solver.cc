@@ -132,10 +132,22 @@ DenseSchurComplementSolver::SolveReducedLinearSystem(double* solution) {
   summary.num_iterations = 1;
 
   if (options().dense_linear_algebra_library_type == EIGEN) {
-    Eigen::LLT<Matrix, Eigen::Upper> llt =
-        ConstMatrixRef(m->values(), num_rows, num_rows)
-        .selfadjointView<Eigen::Upper>()
-        .llt();
+    Eigen::LLT<Matrix, Eigen::Upper> llt;
+    if (options_.jacobian_casting == 1) {
+      auto lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
+      auto lhs_copy_casted = lhs.cast<float>();
+      Matrix lhs_recast = lhs_copy_casted.cast<double>();
+      llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
+    } else if (options_.jacobian_casting == 2) {
+      auto lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
+      auto lhs_copy_casted = lhs.cast<Eigen::half>();
+      Matrix lhs_recast = lhs_copy_casted.cast<double>();
+      llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
+    } else {
+      llt = ConstMatrixRef(m->values(), num_rows, num_rows)
+          .selfadjointView<Eigen::Upper>()
+          .llt();
+    }
     if (llt.info() != Eigen::Success) {
       summary.termination_type = LINEAR_SOLVER_FAILURE;
       summary.message = "Eigen LLT decomposition failed.";
