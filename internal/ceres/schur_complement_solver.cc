@@ -144,6 +144,13 @@ DenseSchurComplementSolver::SolveReducedLinearSystem(double* solution) {
       Matrix lhs_recast = lhs_copy_casted.cast<double>();
       llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
     } else {
+      auto lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
+      auto lhs_copy_casted = lhs.cast<double>();
+      Matrix lhs_recast = lhs_copy_casted.cast<double>();
+      llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
+    }
+    if (false) {
+      // This is what Ceres did originally:
       llt = ConstMatrixRef(m->values(), num_rows, num_rows)
           .selfadjointView<Eigen::Upper>()
           .llt();

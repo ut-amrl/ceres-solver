@@ -50,9 +50,52 @@
 #include "ceres/visibility_based_preconditioner.h"
 #include "ceres/wall_time.h"
 #include "glog/logging.h"
+#include "gflags/gflags.h"
+
+DEFINE_bool(write_jacobians, false,
+            "If true, the jacobians will be written to the "
+            "jacobians directory.");
+
+namespace {
+
+struct LinearSystemsWriter {
+  explicit LinearSystemsWriter(const std::string& save_path)
+      : save_path_(save_path) {}
+
+  void Write(const int num_rows,
+             const int num_cols,
+             const ceres::internal::BlockSparseMatrix& A,
+             const double* b) {
+    if (!FLAGS_write_jacobians) {
+      return;
+    }
+    const std::string A_filename = ceres::internal::StringPrintf(
+        "%s/A_%09lu.txt", save_path_.c_str(),idx_);
+    const std::string b_filename = ceres::internal::StringPrintf(
+        "%s/b_%09lu.txt", save_path_.c_str(),idx_);
+    FILE* A_file = fopen(A_filename.c_str(), "w");
+    FILE* b_file = fopen(b_filename.c_str(), "w");
+    CHECK_NE(A_file, nullptr) << "Could not open file " << A_filename;
+    CHECK_NE(b_file, nullptr) << "Could not open file " << b_filename;
+    fprintf(A_file, "%d %d\n", num_rows, num_cols);
+    A.ToTextFile(A_file);
+    fclose(A_file);
+    for (int i = 0; i < num_rows; ++i) {
+      fprintf(b_file, "%20f\n", b[i]);
+    }
+    fclose(b_file);
+    idx_++;
+  }
+  uint64_t idx_ = 0;
+  std::string save_path_;
+};
+
+}  // namespace
 
 namespace ceres {
 namespace internal {
+
+LinearSystemsWriter writer_("jacobians");
 
 IterativeSchurComplementSolver::IterativeSchurComplementSolver(
     const LinearSolver::Options& options)
@@ -67,6 +110,7 @@ LinearSolver::Summary IterativeSchurComplementSolver::SolveImpl(
     const double* b,
     const LinearSolver::PerSolveOptions& per_solve_options,
     double* x) {
+  writer_.Write(A->num_rows(), A->num_cols(), *A, b);
   EventLogger event_logger("IterativeSchurComplementSolver::Solve");
 
   CHECK_NOTNULL(A->block_structure());
