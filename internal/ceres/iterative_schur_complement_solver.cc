@@ -69,6 +69,10 @@ struct LinearSystemsWriter {
     if (!FLAGS_write_jacobians) {
       return;
     }
+    idx_++;
+    if (idx_ % 1000 != 0) {
+      return;
+    }
     const std::string A_filename = ceres::internal::StringPrintf(
         "%s/A_%09lu.txt", save_path_.c_str(),idx_);
     const std::string b_filename = ceres::internal::StringPrintf(
@@ -84,7 +88,6 @@ struct LinearSystemsWriter {
       fprintf(b_file, "%20f\n", b[i]);
     }
     fclose(b_file);
-    idx_++;
   }
   uint64_t idx_ = 0;
   std::string save_path_;
