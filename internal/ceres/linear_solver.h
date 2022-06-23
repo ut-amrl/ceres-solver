@@ -45,7 +45,11 @@
 #include "ceres/execution_summary.h"
 #include "ceres/triplet_sparse_matrix.h"
 #include "ceres/types.h"
+#include "gflags/gflags.h"
 #include "glog/logging.h"
+
+DECLARE_bool(write_jacobians);
+DECLARE_string(write_jacobians_dir);
 
 namespace ceres {
 namespace internal {
@@ -299,6 +303,97 @@ class LinearSolver {
   // Factory
   static LinearSolver* Create(const Options& options);
 };
+
+struct LinearSystemsWriter {
+  void Write(const int num_rows,
+             const int num_cols,
+             const ceres::internal::BlockSparseMatrix& A,
+             const double* b) {
+    if (!FLAGS_write_jacobians) {
+      return;
+    }
+    idx_++;
+    if ((idx_ % 100) != 0) {
+      return;
+    }
+    const std::string A_filename = ceres::internal::StringPrintf(
+        "%s/A_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_);
+    const std::string b_filename = ceres::internal::StringPrintf(
+        "%s/b_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_);
+    FILE* A_file = fopen(A_filename.c_str(), "w");
+    FILE* b_file = fopen(b_filename.c_str(), "w");
+    CHECK_NE(A_file, nullptr) << "Could not open file " << A_filename;
+    CHECK_NE(b_file, nullptr) << "Could not open file " << b_filename;
+    fprintf(A_file, "%d %d\n", num_rows, num_cols);
+    A.ToTextFile(A_file);
+    fclose(A_file);
+    for (int i = 0; i < num_rows; ++i) {
+      fprintf(b_file, "%20f\n", b[i]);
+    }
+    fclose(b_file);
+  }
+  void Write(const int num_rows,
+             const int num_cols,
+             const ConstMatrixRef& A,
+             const double* b) {
+    if (!FLAGS_write_jacobians) {
+      return;
+    }
+    idx_++;
+    if ((idx_ % 100) != 0) {
+      return;
+    }
+    const std::string A_filename = ceres::internal::StringPrintf(
+        "%s/A_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_);
+    const std::string b_filename = ceres::internal::StringPrintf(
+        "%s/b_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_);
+    FILE* A_file = fopen(A_filename.c_str(), "w");
+    FILE* b_file = fopen(b_filename.c_str(), "w");
+    CHECK_NE(A_file, nullptr) << "Could not open file " << A_filename;
+    CHECK_NE(b_file, nullptr) << "Could not open file " << b_filename;
+    fprintf(A_file, "%d %d\n", num_rows, num_cols);
+    for (int i = 0; i < num_rows; ++i) {
+      for (int j = 0; j < num_cols; ++j) {
+        fprintf(A_file, "% 10d % 10d %20.15f\n", i, j, A(i, j));
+      }
+    }
+    fclose(A_file);
+    for (int i = 0; i < num_rows; ++i) {
+      fprintf(b_file, "%20.15f\n", b[i]);
+    }
+    fclose(b_file);
+  }
+
+  void WriteBinary(const uint32_t num_rows,
+                   const uint32_t num_cols,
+                   const BlockSparseMatrix& A,
+                   const double* b) {
+    if (!FLAGS_write_jacobians) {
+      return;
+    }
+    idx_++;
+    if ((idx_ % 100) != 0) {
+      return;
+    }
+    const std::string A_filename = ceres::internal::StringPrintf(
+        "%s/A_%09lu.bin", FLAGS_write_jacobians_dir.c_str(),idx_);
+    const std::string b_filename = ceres::internal::StringPrintf(
+        "%s/b_%09lu.bin", FLAGS_write_jacobians_dir.c_str(),idx_);
+    FILE* A_file = fopen(A_filename.c_str(), "wb");
+    FILE* b_file = fopen(b_filename.c_str(), "wb");
+    CHECK_NE(A_file, nullptr) << "Could not open file " << A_filename;
+    CHECK_NE(b_file, nullptr) << "Could not open file " << b_filename;
+    fwrite(&num_rows, sizeof(uint32_t), 1, A_file);
+    fwrite(&num_cols, sizeof(uint32_t), 1, A_file);
+    A.ToBinaryFile(A_file);
+    fclose(A_file);
+    fwrite(b, sizeof(double), num_rows, b_file);
+    fclose(b_file);
+  }
+  uint64_t idx_ = 0;
+};
+
+extern LinearSystemsWriter writer_;
 
 // This templated subclass of LinearSolver serves as a base class for
 // other linear solvers that depend on the particular matrix layout of

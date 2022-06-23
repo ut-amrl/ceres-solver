@@ -160,6 +160,9 @@ DenseSchurComplementSolver::SolveReducedLinearSystem(double* solution) {
       summary.message = "Eigen LLT decomposition failed.";
       return summary;
     }
+    ConstMatrixRef lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
+    writer_.Write(num_rows, num_rows, lhs, rhs());
+    // writer_.WriteBinary(num_rows, num_rows, lhs, rhs());
 
     VectorRef(solution, num_rows) = llt.solve(ConstVectorRef(rhs(), num_rows));
   } else {

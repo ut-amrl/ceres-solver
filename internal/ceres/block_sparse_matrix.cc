@@ -230,10 +230,38 @@ void BlockSparseMatrix::ToTextFile(FILE* file) const {
       int jac_pos = cells[j].position;
       for (int r = 0; r < row_block_size; ++r) {
         for (int c = 0; c < col_block_size; ++c) {
-          fprintf(file, "% 10d % 10d %17f\n",
+          fprintf(file, "% 10d % 10d %20.15f\n",
                   row_block_pos + r,
                   col_block_pos + c,
                   values_[jac_pos++]);
+        }
+      }
+    }
+  }
+}
+
+void BlockSparseMatrix::ToBinaryFile(FILE* file) const {
+  CHECK_NOTNULL(file);
+  const uint32_t num_rows = num_rows_;
+  const uint32_t num_cols = num_cols_;
+  fwrite(&num_rows, sizeof(uint32_t), 1, file);
+  fwrite(&num_cols, sizeof(uint32_t), 1, file);
+  for (int i = 0; i < block_structure_->rows.size(); ++i) {
+    const int row_block_pos = block_structure_->rows[i].block.position;
+    const int row_block_size = block_structure_->rows[i].block.size;
+    const vector<Cell>& cells = block_structure_->rows[i].cells;
+    for (int j = 0; j < cells.size(); ++j) {
+      const int col_block_id = cells[j].block_id;
+      const int col_block_size = block_structure_->cols[col_block_id].size;
+      const int col_block_pos = block_structure_->cols[col_block_id].position;
+      int jac_pos = cells[j].position;
+      for (int r = 0; r < row_block_size; ++r) {
+        for (int c = 0; c < col_block_size; ++c) {
+          const uint32_t row = row_block_pos + r;
+          const uint32_t col = col_block_pos + c;
+          fwrite(&row, sizeof(uint32_t), 1, file);
+          fwrite(&col, sizeof(uint32_t), 1, file);
+          fwrite(&values_[jac_pos++], sizeof(double), 1, file);
         }
       }
     }

@@ -37,10 +37,19 @@
 #include "ceres/schur_complement_solver.h"
 #include "ceres/sparse_normal_cholesky_solver.h"
 #include "ceres/types.h"
+#include "gflags/gflags.h"
 #include "glog/logging.h"
+
+DEFINE_bool(write_jacobians, false,
+            "If true, the jacobians will be written to the "
+            "jacobians directory.");
+DEFINE_string(write_jacobians_dir, "jacobians",
+              "Directory where the jacobians will be written.");
 
 namespace ceres {
 namespace internal {
+
+LinearSystemsWriter writer_;
 
 LinearSolver::~LinearSolver() {
 }
