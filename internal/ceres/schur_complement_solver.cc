@@ -51,17 +51,132 @@
 #include "ceres/triplet_sparse_matrix.h"
 #include "ceres/types.h"
 #include "ceres/wall_time.h"
+#include "gflags/gflags.h"
 
 using std::vector;
 
+DEFINE_bool(dense_pcg, false, "Use dense preconditioned conjugate gradient.");
+DEFINE_double(pcg_tolerance, 
+    1e-6, "Preconditioned conjugate gradient tolerance.");
 namespace ceres {
 namespace internal {
+
+FILE* minimizer_progress_file_ = NULL;
+
+LinearSolver::Summary PCG(const Matrix& A,
+                          const Vector& b,
+                          const Matrix& preconditioner,
+                          const LinearSolver::Options& options,
+                          Vector* x_ptr) {
+  static const bool kDebug = false;
+  CHECK_NE(x_ptr, nullptr);
+  CHECK_EQ(A.rows(), A.cols());
+  CHECK_EQ(A.rows(), b.rows());
+  CHECK_EQ(A.cols(), x_ptr->rows());
+  LinearSolver::Summary summary;
+  summary.num_iterations = 0;
+  summary.termination_type = LINEAR_SOLVER_FAILURE;
+
+  Vector& x = *x_ptr;
+  // x.setZero();
+
+  const double kTolerance = 1e-12;
+  const int kMaxIterations = 100;
+  const int kResidualResetPeriod = 10;
+  const double tol_r = kTolerance * b.norm();
+  Vector r = b - A * x;
+
+  if (kDebug) {
+    printf("PCG: tol_r = %e\n", tol_r);
+    printf("  1: |Ax-b|=%10e, |Ax-b|/|b|=%10e\n",
+           r.norm(),
+           r.norm() / b.norm());
+  }
+  if (r.norm() <= tol_r) {
+    summary.termination_type = LINEAR_SOLVER_SUCCESS;
+    summary.message = StringPrintf(
+        "Convergence. |r| = %e <= %e.\n", r.norm(), tol_r);
+    return summary;
+  }
+
+  Vector p;
+  Vector z;
+
+  double rho = 1.0;
+  for (summary.num_iterations = 1;
+       summary.num_iterations < kMaxIterations;
+        ++summary.num_iterations) {
+    z = preconditioner * r;
+    const double last_rho = rho;
+    rho = r.transpose() * z;
+    if (rho == 0.0) {
+      summary.termination_type = LINEAR_SOLVER_FAILURE;
+      summary.message = StringPrintf(
+          "Numerical failure. rho = r'z = %e.\n", rho);
+      return summary;
+    }
+
+    // Set current gradient direction.
+    if (summary.num_iterations == 1) {
+      p = z;
+    } else {
+      const double beta = rho / last_rho;
+      p = z + beta * p;
+    }
+    z = A * p;
+    const double pq = p.transpose() * z;
+    if (pq <= 0.0 || !std::isfinite(pq)) {
+      summary.termination_type = LINEAR_SOLVER_FAILURE;
+      summary.message = StringPrintf(
+          "Numerical failure. p'q = %e.\n", pq);
+      return summary;
+    }
+    const double alpha = rho / pq;
+    if (!std::isfinite(alpha)) {
+      summary.termination_type = LINEAR_SOLVER_FAILURE;
+      summary.message = StringPrintf(
+          "Numerical failure. alpha = %e.\n", alpha);
+      return summary;
+    }
+    x += alpha * p;
+
+    // Reset residual if we've been iterating for a while.
+    if (summary.num_iterations % kResidualResetPeriod == 0) {
+      r = b - A * x;
+    } else {
+      r -= alpha * z;
+    }
+
+    if (r.norm() < tol_r) {
+      summary.termination_type = LINEAR_SOLVER_SUCCESS;
+      summary.message = StringPrintf(
+          "Convergence. |r| = %e <= %e.\n", r.norm(), tol_r);
+      return summary;
+    }
+    if (kDebug) {
+      printf("%3d: |Ax-b|=%10e, |Ax-b|/|b|=%10e\n",
+             summary.num_iterations,
+             r.norm(),
+             r.norm() / b.norm());
+    }
+  }
+  summary.termination_type = LINEAR_SOLVER_NO_CONVERGENCE;
+  summary.message = StringPrintf(
+      "No convergence after %d iterations. |r| = %e > %e.\n",
+      summary.num_iterations,
+      r.norm(), 
+      tol_r);
+  return summary;
+}
 
 LinearSolver::Summary SchurComplementSolver::SolveImpl(
     BlockSparseMatrix* A,
     const double* b,
     const LinearSolver::PerSolveOptions& per_solve_options,
     double* x) {
+  if (minimizer_progress_file_ == nullptr) {
+    minimizer_progress_file_ = fopen("minimizer_progress.txt", "w");
+  }
   EventLogger event_logger("SchurComplementSolver::Solve");
 
   if (eliminator_.get() == NULL) {
@@ -95,6 +210,11 @@ LinearSolver::Summary SchurComplementSolver::SolveImpl(
   error.setZero();
   A->RightMultiply(x, error.data());
   const double convergence_norm = error.norm() / bref.norm();
+  fprintf(minimizer_progress_file_,
+          " %20.15f %20.15f %20.15f\n",
+          error.norm(),
+          bref.norm(),
+          convergence_norm);
   printf("|err|: %f |b|: %f err/|b|: %f\n",
       error.norm(), bref.norm(), convergence_norm);
   return summary;
@@ -140,47 +260,70 @@ DenseSchurComplementSolver::SolveReducedLinearSystem(double* solution) {
 
   summary.num_iterations = 1;
 
-  if (options().dense_linear_algebra_library_type == EIGEN) {
-    Eigen::LLT<Matrix, Eigen::Upper> llt;
-    if (options_.jacobian_casting == 1) {
-      auto lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
-      auto lhs_copy_casted = lhs.cast<float>();
-      Matrix lhs_recast = lhs_copy_casted.cast<double>();
-      llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
-    } else if (options_.jacobian_casting == 2) {
-      auto lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
-      auto lhs_copy_casted = lhs.cast<Eigen::half>();
-      Matrix lhs_recast = lhs_copy_casted.cast<double>();
-      llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
-    } else {
-      auto lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
-      auto lhs_copy_casted = lhs.cast<double>();
-      Matrix lhs_recast = lhs_copy_casted.cast<double>();
-      llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
-    }
-    if (false) {
-      // This is what Ceres did originally:
-      llt = ConstMatrixRef(m->values(), num_rows, num_rows)
-          .selfadjointView<Eigen::Upper>()
-          .llt();
-    }
-    if (llt.info() != Eigen::Success) {
-      summary.termination_type = LINEAR_SOLVER_FAILURE;
-      summary.message = "Eigen LLT decomposition failed.";
-      return summary;
-    }
-    ConstMatrixRef lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
-    writer_.Write(num_rows, num_rows, lhs, rhs());
-    // writer_.WriteBinary(num_rows, num_rows, lhs, rhs());
+  double pcg_convergence_norm_ = 1;
+  if (FLAGS_dense_pcg) {
+    ConstVectorRef b(rhs(), num_rows);
+    const Matrix A = ConstMatrixRef(m->values(), num_rows, num_rows)
+                                   .selfadjointView<Eigen::Upper>();
+    // Vector b(num_rows);
+    // b.setRandom();
+    // Matrix A(num_rows, num_rows);
+    // A.setRandom();
+    // A = A.transpose() * A;
+    Vector x(num_rows);
+    x.setZero();
+    const Matrix preconditioner = Matrix::Identity(num_rows, num_rows);
+    // summary = PCG(A, b, preconditioner, options_, &x);
+    PCG(A, b, preconditioner, options_, &x);
+    VectorRef(solution, num_rows) = x;
+    pcg_convergence_norm_ = (A * x - b).norm() / b.norm();
+  }
+  fprintf(minimizer_progress_file_, 
+      "%d ", pcg_convergence_norm_ > FLAGS_pcg_tolerance);
 
-    VectorRef(solution, num_rows) = llt.solve(ConstVectorRef(rhs(), num_rows));
-  } else {
-    VectorRef(solution, num_rows) = ConstVectorRef(rhs(), num_rows);
-    summary.termination_type =
-        LAPACK::SolveInPlaceUsingCholesky(num_rows,
-                                          m->values(),
-                                          solution,
-                                          &summary.message);
+  if (!FLAGS_dense_pcg || pcg_convergence_norm_ > FLAGS_pcg_tolerance) {
+    if (options().dense_linear_algebra_library_type == EIGEN) {
+      Eigen::LLT<Matrix, Eigen::Upper> llt;
+      if (options_.jacobian_casting == 1) {
+        auto lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
+        auto lhs_copy_casted = lhs.cast<float>();
+        Matrix lhs_recast = lhs_copy_casted.cast<double>();
+        llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
+      } else if (options_.jacobian_casting == 2) {
+        auto lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
+        auto lhs_copy_casted = lhs.cast<Eigen::half>();
+        Matrix lhs_recast = lhs_copy_casted.cast<double>();
+        llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
+      } else {
+        auto lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
+        auto lhs_copy_casted = lhs.cast<double>();
+        Matrix lhs_recast = lhs_copy_casted.cast<double>();
+        llt = lhs_recast.selfadjointView<Eigen::Upper>().llt();
+      }
+      if (false) {
+        // This is what Ceres did originally:
+        llt = ConstMatrixRef(m->values(), num_rows, num_rows)
+            .selfadjointView<Eigen::Upper>()
+            .llt();
+      }
+      if (llt.info() != Eigen::Success) {
+        summary.termination_type = LINEAR_SOLVER_FAILURE;
+        summary.message = "Eigen LLT decomposition failed.";
+        return summary;
+      }
+      ConstMatrixRef lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
+      writer_.Write(num_rows, num_rows, lhs, rhs());
+      // writer_.WriteBinary(num_rows, num_rows, lhs, rhs());
+
+      VectorRef(solution, num_rows) = llt.solve(ConstVectorRef(rhs(), num_rows));
+    } else {
+      VectorRef(solution, num_rows) = ConstVectorRef(rhs(), num_rows);
+      summary.termination_type =
+          LAPACK::SolveInPlaceUsingCholesky(num_rows,
+                                            m->values(),
+                                            solution,
+                                            &summary.message);
+    }
   }
   {
     ConstVectorRef bref(rhs(), num_rows);
@@ -189,8 +332,14 @@ DenseSchurComplementSolver::SolveReducedLinearSystem(double* solution) {
     ConstVectorRef xref(solution, num_rows);
     Vector error = A * xref - bref;
     const double convergence_norm = error.norm() / bref.norm();
+    fprintf(minimizer_progress_file_,
+            "%20.15f %20.15f %20.15f",
+            error.norm(),
+            bref.norm(),
+            convergence_norm);
     printf("Reduced system := |err|: %e |b|: %e err/|b|: %e\n",
         error.norm(), bref.norm(), convergence_norm);
+    // CHECK_LE(convergence_norm, 1e-6);
   }
 
   return summary;
