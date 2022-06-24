@@ -117,7 +117,7 @@ class TrustRegionLoggingCallback : public IterationCallback {
     if (log_to_stdout_) {
       cout << output << endl;
     } else {
-      VLOG(1) << output;
+      VLOG(3) << output;
     }
     return SOLVER_CONTINUE;
   }

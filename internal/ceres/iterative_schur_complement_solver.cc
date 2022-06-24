@@ -83,6 +83,10 @@ LinearSolver::Summary IterativeSchurComplementSolver::SolveImpl(
     schur_complement_.reset(new ImplicitSchurComplement(options_));
   }
   schur_complement_->Init(*A, per_solve_options.D, b);
+  // printf("num_eliminate_blocks: %d e_block_size:%d f_block_size:%d\n",
+  //         num_eliminate_blocks,
+  //         options_.e_block_size,
+  //         options_.f_block_size);
 
   const int num_schur_complement_blocks =
       A->block_structure()->cols.size() - num_eliminate_blocks;
@@ -169,12 +173,31 @@ LinearSolver::Summary IterativeSchurComplementSolver::SolveImpl(
                                  schur_complement_->rhs().data(),
                                  cg_per_solve_options,
                                  reduced_linear_system_solution_.data());
+    {
+      // err = -b;
+      Vector error = -schur_complement_->rhs();
+      // err = A * x + err = A * x - b;
+      schur_complement_.get()->RightMultiply(
+          reduced_linear_system_solution_.data(),
+          error.data());
+      const Vector& b = schur_complement_->rhs();
+      const double convergence_norm = error.norm() / b.norm();
+      printf("Reduced system := |err|: %e |b|: %e err/|b|: %e\n",
+        error.norm(), b.norm(), convergence_norm);
+    }
     if (cg_summary.termination_type != LINEAR_SOLVER_FAILURE &&
         cg_summary.termination_type != LINEAR_SOLVER_FATAL_ERROR) {
       schur_complement_->BackSubstitute(
           reduced_linear_system_solution_.data(), x);
     }
   }
+  ConstVectorRef bref(b, A->num_rows());
+  ConstVectorRef xref(x, A->num_cols());
+  Vector error = -bref;
+  A->RightMultiply(x, error.data());
+  const double convergence_norm = error.norm() / bref.norm();
+  printf("|err|: %f |b|: %f err/|b|: %f\n",
+      error.norm(), bref.norm(), convergence_norm);
   event_logger.AddEvent("Solve");
   return cg_summary;
 }

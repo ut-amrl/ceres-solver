@@ -52,6 +52,8 @@
 #include "ceres/types.h"
 #include "ceres/wall_time.h"
 
+using std::vector;
+
 namespace ceres {
 namespace internal {
 
@@ -87,7 +89,14 @@ LinearSolver::Summary SchurComplementSolver::SolveImpl(
     eliminator_->BackSubstitute(A, b, per_solve_options.D, reduced_solution, x);
     event_logger.AddEvent("BackSubstitute");
   }
-
+  ConstVectorRef bref(b, A->num_rows());
+  ConstVectorRef xref(x, A->num_cols());
+  Vector error(A->num_rows());
+  error.setZero();
+  A->RightMultiply(x, error.data());
+  const double convergence_norm = error.norm() / bref.norm();
+  printf("|err|: %f |b|: %f err/|b|: %f\n",
+      error.norm(), bref.norm(), convergence_norm);
   return summary;
 }
 
@@ -172,6 +181,16 @@ DenseSchurComplementSolver::SolveReducedLinearSystem(double* solution) {
                                           m->values(),
                                           solution,
                                           &summary.message);
+  }
+  {
+    ConstVectorRef bref(rhs(), num_rows);
+    Matrix A = ConstMatrixRef(m->values(), num_rows, num_rows)
+                   .selfadjointView<Eigen::Upper>();
+    ConstVectorRef xref(solution, num_rows);
+    Vector error = A * xref - bref;
+    const double convergence_norm = error.norm() / bref.norm();
+    printf("Reduced system := |err|: %e |b|: %e err/|b|: %e\n",
+        error.norm(), bref.norm(), convergence_norm);
   }
 
   return summary;
