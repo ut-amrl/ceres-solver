@@ -307,19 +307,34 @@ class LinearSolver {
 struct LinearSystemsWriter {
   void Write(const int num_rows,
              const int num_cols,
+             bool reduced,
              const ceres::internal::BlockSparseMatrix& A,
              const double* b) {
     if (!FLAGS_write_jacobians) {
       return;
     }
-    idx_++;
+    // Increment the index only if we are writing the full Jacobians, so that
+    // the reduced system has the same index.
+    if (!reduced) {
+      idx_++;
+    }
     if ((idx_ % 100) != 0) {
       return;
     }
-    const std::string A_filename = ceres::internal::StringPrintf(
-        "%s/A_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_);
-    const std::string b_filename = ceres::internal::StringPrintf(
-        "%s/b_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_);
+    const std::string A_filename = (
+        reduced ?
+        ceres::internal::StringPrintf(
+            "%s/A_reduced_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_) :
+        ceres::internal::StringPrintf(
+            "%s/A_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_)
+    );
+    const std::string b_filename = (
+        reduced ?
+        ceres::internal::StringPrintf(
+            "%s/b_reduced_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_) :
+        ceres::internal::StringPrintf(
+            "%s/b_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_)
+    );
     FILE* A_file = fopen(A_filename.c_str(), "w");
     FILE* b_file = fopen(b_filename.c_str(), "w");
     CHECK_NE(A_file, nullptr) << "Could not open file " << A_filename;
@@ -334,19 +349,34 @@ struct LinearSystemsWriter {
   }
   void Write(const int num_rows,
              const int num_cols,
+             bool reduced,
              const ConstMatrixRef& A,
              const double* b) {
     if (!FLAGS_write_jacobians) {
       return;
     }
-    idx_++;
+    // Increment the index only if we are writing the full Jacobians, so that
+    // the reduced system has the same index.
+    if (!reduced) {
+      idx_++;
+    }
     if ((idx_ % 100) != 0) {
       return;
     }
-    const std::string A_filename = ceres::internal::StringPrintf(
-        "%s/A_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_);
-    const std::string b_filename = ceres::internal::StringPrintf(
-        "%s/b_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_);
+    const std::string A_filename = (
+        reduced ?
+        ceres::internal::StringPrintf(
+            "%s/A_reduced_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_) :
+        ceres::internal::StringPrintf(
+            "%s/A_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_)
+    );
+    const std::string b_filename = (
+        reduced ?
+        ceres::internal::StringPrintf(
+            "%s/b_reduced_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_) :
+        ceres::internal::StringPrintf(
+            "%s/b_%09lu.txt", FLAGS_write_jacobians_dir.c_str(),idx_)
+    );
     FILE* A_file = fopen(A_filename.c_str(), "w");
     FILE* b_file = fopen(b_filename.c_str(), "w");
     CHECK_NE(A_file, nullptr) << "Could not open file " << A_filename;

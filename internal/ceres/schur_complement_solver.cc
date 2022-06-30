@@ -56,8 +56,11 @@
 using std::vector;
 
 DEFINE_bool(dense_pcg, false, "Use dense preconditioned conjugate gradient.");
-DEFINE_double(pcg_tolerance, 
+DEFINE_double(pcg_tolerance,
     1e-6, "Preconditioned conjugate gradient tolerance.");
+
+const bool kPrintLinearSolverErrors = false;
+
 namespace ceres {
 namespace internal {
 
@@ -81,8 +84,8 @@ LinearSolver::Summary PCG(const Matrix& A,
   // x.setZero();
 
   const double kTolerance = 1e-12;
-  const int kMaxIterations = 100;
-  const int kResidualResetPeriod = 10;
+  const int kMaxIterations = 20;
+  const int kResidualResetPeriod = 6;
   const double tol_r = kTolerance * b.norm();
   Vector r = b - A * x;
 
@@ -164,7 +167,7 @@ LinearSolver::Summary PCG(const Matrix& A,
   summary.message = StringPrintf(
       "No convergence after %d iterations. |r| = %e > %e.\n",
       summary.num_iterations,
-      r.norm(), 
+      r.norm(),
       tol_r);
   return summary;
 }
@@ -178,6 +181,8 @@ LinearSolver::Summary SchurComplementSolver::SolveImpl(
     minimizer_progress_file_ = fopen("minimizer_progress.txt", "w");
   }
   EventLogger event_logger("SchurComplementSolver::Solve");
+
+  writer_.Write(A->num_rows(), A->num_cols(), false, *A, b);
 
   if (eliminator_.get() == NULL) {
     InitStorage(A->block_structure());
@@ -215,8 +220,10 @@ LinearSolver::Summary SchurComplementSolver::SolveImpl(
           error.norm(),
           bref.norm(),
           convergence_norm);
-  printf("|err|: %f |b|: %f err/|b|: %f\n",
-      error.norm(), bref.norm(), convergence_norm);
+  if (kPrintLinearSolverErrors) {
+    printf("|err|: %f |b|: %f err/|b|: %f\n",
+        error.norm(), bref.norm(), convergence_norm);
+  }
   return summary;
 }
 
@@ -278,9 +285,12 @@ DenseSchurComplementSolver::SolveReducedLinearSystem(double* solution) {
     VectorRef(solution, num_rows) = x;
     pcg_convergence_norm_ = (A * x - b).norm() / b.norm();
   }
-  fprintf(minimizer_progress_file_, 
+  fprintf(minimizer_progress_file_,
       "%d ", pcg_convergence_norm_ > FLAGS_pcg_tolerance);
 
+  ConstMatrixRef lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
+  writer_.Write(num_rows, num_rows, true, lhs, rhs());
+  // writer_.WriteBinary(num_rows, num_rows, lhs, rhs());
   if (!FLAGS_dense_pcg || pcg_convergence_norm_ > FLAGS_pcg_tolerance) {
     if (options().dense_linear_algebra_library_type == EIGEN) {
       Eigen::LLT<Matrix, Eigen::Upper> llt;
@@ -311,9 +321,6 @@ DenseSchurComplementSolver::SolveReducedLinearSystem(double* solution) {
         summary.message = "Eigen LLT decomposition failed.";
         return summary;
       }
-      ConstMatrixRef lhs = ConstMatrixRef(m->values(), num_rows, num_rows);
-      writer_.Write(num_rows, num_rows, lhs, rhs());
-      // writer_.WriteBinary(num_rows, num_rows, lhs, rhs());
 
       VectorRef(solution, num_rows) = llt.solve(ConstVectorRef(rhs(), num_rows));
     } else {
@@ -337,8 +344,10 @@ DenseSchurComplementSolver::SolveReducedLinearSystem(double* solution) {
             error.norm(),
             bref.norm(),
             convergence_norm);
-    printf("Reduced system := |err|: %e |b|: %e err/|b|: %e\n",
-        error.norm(), bref.norm(), convergence_norm);
+    if (kPrintLinearSolverErrors) {
+      printf("Reduced system := |err|: %e |b|: %e err/|b|: %e\n",
+          error.norm(), bref.norm(), convergence_norm);
+    }
     // CHECK_LE(convergence_norm, 1e-6);
   }
 

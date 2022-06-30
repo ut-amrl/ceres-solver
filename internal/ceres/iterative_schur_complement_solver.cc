@@ -51,6 +51,8 @@
 #include "ceres/wall_time.h"
 #include "glog/logging.h"
 
+const bool kPrintLinearSolverErrors = false;
+
 namespace ceres {
 namespace internal {
 
@@ -67,7 +69,7 @@ LinearSolver::Summary IterativeSchurComplementSolver::SolveImpl(
     const double* b,
     const LinearSolver::PerSolveOptions& per_solve_options,
     double* x) {
-  writer_.Write(A->num_rows(), A->num_cols(), *A, b);
+  writer_.Write(A->num_rows(), A->num_cols(), false, *A, b);
   // writer_.WriteBinary(A->num_rows(), A->num_cols(), *A, b);
   EventLogger event_logger("IterativeSchurComplementSolver::Solve");
 
@@ -182,8 +184,10 @@ LinearSolver::Summary IterativeSchurComplementSolver::SolveImpl(
           error.data());
       const Vector& b = schur_complement_->rhs();
       const double convergence_norm = error.norm() / b.norm();
-      printf("Reduced system := |err|: %e |b|: %e err/|b|: %e\n",
-        error.norm(), b.norm(), convergence_norm);
+      if (kPrintLinearSolverErrors) {
+        printf("Reduced system := |err|: %e |b|: %e err/|b|: %e\n",
+          error.norm(), b.norm(), convergence_norm);
+      }
     }
     if (cg_summary.termination_type != LINEAR_SOLVER_FAILURE &&
         cg_summary.termination_type != LINEAR_SOLVER_FATAL_ERROR) {
@@ -196,8 +200,10 @@ LinearSolver::Summary IterativeSchurComplementSolver::SolveImpl(
   Vector error = -bref;
   A->RightMultiply(x, error.data());
   const double convergence_norm = error.norm() / bref.norm();
-  printf("|err|: %f |b|: %f err/|b|: %f\n",
-      error.norm(), bref.norm(), convergence_norm);
+  if (kPrintLinearSolverErrors) {
+    printf("|err|: %f |b|: %f err/|b|: %f\n",
+        error.norm(), bref.norm(), convergence_norm);
+  }
   event_logger.AddEvent("Solve");
   return cg_summary;
 }
