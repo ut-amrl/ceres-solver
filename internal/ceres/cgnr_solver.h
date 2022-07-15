@@ -36,6 +36,13 @@
 #include "ceres/internal/export.h"
 #include "ceres/linear_solver.h"
 
+#ifndef CERES_NO_CUDA
+#include "ceres/cuda_conjugate_gradients_solver.h"
+#include "ceres/cuda_linear_operator.h"
+#include "ceres/cuda_sparse_matrix.h"
+#include "ceres/cuda_vector.h"
+#endif  // CERES_NO_CUDA
+
 namespace ceres::internal {
 
 class Preconditioner;
@@ -67,6 +74,29 @@ class CERES_NO_EXPORT CgnrSolver final : public BlockSparseMatrixSolver {
   Vector cg_solution_;
   Vector scratch_[4];
 };
+
+#ifndef CERES_NO_CUDA
+class CERES_NO_EXPORT CudaCgnrSolver final : public BlockSparseMatrixSolver {
+ public:
+  static std::unique_ptr<CudaCgnrSolver> Create(
+      LinearSolver::Options options, std::string* error);
+  CudaCgnrSolver(const CudaCgnrSolver&) = delete;
+  void operator=(const CudaCgnrSolver&) = delete;
+  ~CudaCgnrSolver() override;
+
+  Summary SolveImpl(BlockSparseMatrix* A,
+                    const double* b,
+                    const LinearSolver::PerSolveOptions& per_solve_options,
+                    double* x) final;
+
+ private:
+  CudaCgnrSolver();
+  bool Init(const LinearSolver::Options& options, std::string* error);
+
+  LinearSolver::Options options_;
+  std::unique_ptr<CudaConjugateGradientsSolver> solver_ = nullptr;
+};
+#endif  // CERES_NO_CUDA
 
 }  // namespace ceres::internal
 
