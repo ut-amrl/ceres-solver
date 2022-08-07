@@ -68,7 +68,7 @@
 // clang-format makes the gflags definitions too verbose
 // clang-format off
 
-DEFINE_string(input, "./data/problem-16-22106-pre.txt", "Input File name");
+DEFINE_string(input, "", "Input File name");
 DEFINE_string(trust_region_strategy, "levenberg_marquardt",
               "Options are: levenberg_marquardt, dogleg.");
 DEFINE_string(dogleg, "traditional_dogleg", "Options are: traditional_dogleg,"
@@ -80,20 +80,21 @@ DEFINE_bool(inner_iterations, false, "Use inner iterations to non-linearly "
 DEFINE_string(blocks_for_inner_iterations, "automatic", "Options are: "
               "automatic, cameras, points, cameras,points, points,cameras");
 
-DEFINE_string(linear_solver, "cgnr", "Options are: "
-              "sparse_schur, dense_schur, iterative_schur, sparse_normal_cholesky, "
-              "dense_qr, dense_normal_cholesky and cgnr.");
+DEFINE_string(linear_solver, "sparse_schur", "Options are: "
+              "sparse_schur, dense_schur, iterative_schur, "
+              "sparse_normal_cholesky, dense_qr, dense_normal_cholesky, "
+              "and cgnr.");
 DEFINE_bool(explicit_schur_complement, false, "If using ITERATIVE_SCHUR "
             "then explicitly compute the Schur complement.");
-DEFINE_string(preconditioner, "identity", "Options are: "
+DEFINE_string(preconditioner, "jacobi", "Options are: "
               "identity, jacobi, schur_jacobi, cluster_jacobi, "
               "cluster_tridiagonal.");
 DEFINE_string(visibility_clustering, "canonical_views",
               "single_linkage, canonical_views");
 
-DEFINE_string(sparse_linear_algebra_library, "cuda_sparse",
-              "Options are: suite_sparse, cx_sparse, accelerate_sparse,"
-              " eigen_sparse, and cuda_sparse.");
+DEFINE_string(sparse_linear_algebra_library, "suite_sparse",
+              "Options are: suite_sparse, cx_sparse, accelerate_sparse, "
+              "eigen_sparse, and cuda_sparse.");
 DEFINE_string(dense_linear_algebra_library, "eigen",
               "Options are: eigen, lapack, and cuda");
 DEFINE_string(ordering_type, "amd", "Options are: amd, nesdis");
@@ -109,8 +110,8 @@ DEFINE_double(eta, 1e-2, "Default value for eta. Eta determines the "
               "accuracy of each linear solve of the truncated newton step. "
               "Changing this parameter can affect solve performance.");
 
-DEFINE_int32(num_threads, 24, "Number of threads.");
-DEFINE_int32(num_iterations, 10, "Number of iterations.");
+DEFINE_int32(num_threads, 1, "Number of threads.");
+DEFINE_int32(num_iterations, 5, "Number of iterations.");
 DEFINE_double(max_solver_time, 1e32, "Maximum solve time in seconds.");
 DEFINE_bool(nonmonotonic_steps, false, "Trust region algorithm can use"
             " nonmonotic steps.");
@@ -357,11 +358,6 @@ int main(int argc, char** argv) {
   if (CERES_GET_FLAG(FLAGS_input).empty()) {
     LOG(ERROR) << "Usage: bundle_adjuster --input=bal_problem";
     return 1;
-  }
-  for (int i = 1; i < argc; ++i) {
-    if (strcmp(argv[i], "cpu") == 0) {
-      FLAGS_sparse_linear_algebra_library = "suite_sparse";
-    }
   }
 
   CHECK(CERES_GET_FLAG(FLAGS_use_quaternions) ||
