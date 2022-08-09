@@ -98,7 +98,7 @@ double CudaVector::norm() const {
 
 void CudaVector::CopyFrom(const Vector& x) {
   data_.Reserve(x.rows());
-  data_.CopyFromCpuAsync(x.data(), x.rows(), context_->stream_);
+  data_.CopyFromCpu(x.data(), x.rows(), context_->stream_);
   num_rows_ = x.rows();
   cusparseCreateDnVec(&cusparse_descr_,
                       num_rows_,
@@ -108,7 +108,7 @@ void CudaVector::CopyFrom(const Vector& x) {
 
 void CudaVector::CopyFrom(const double* x, int size) {
   data_.Reserve(size);
-  data_.CopyFromCpuAsync(x, size, context_->stream_);
+  data_.CopyFromCpu(x, size, context_->stream_);
   num_rows_ = size;
   cusparseCreateDnVec(&cusparse_descr_,
                       num_rows_,

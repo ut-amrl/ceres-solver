@@ -71,9 +71,9 @@ bool CudaSparseMatrix::Init(ContextImpl* context, std::string* message) {
 }
 
 void CudaSparseMatrix::CopyFrom(const CRSMatrix& crs_matrix) {
-  csr_row_indices_.CopyFromCpuAsync(crs_matrix.rows, context_->stream_);
-  csr_col_indices_.CopyFromCpuAsync(crs_matrix.cols, context_->stream_);
-  csr_values_.CopyFromCpuAsync(crs_matrix.values, context_->stream_);
+  csr_row_indices_.CopyFromCpuVector(crs_matrix.rows, context_->stream_);
+  csr_col_indices_.CopyFromCpuVector(crs_matrix.cols, context_->stream_);
+  csr_values_.CopyFromCpuVector(crs_matrix.values, context_->stream_);
   num_rows_ = crs_matrix.num_rows;
   num_cols_ = crs_matrix.num_cols;
   num_nonzeros_ = crs_matrix.values.size();
@@ -95,11 +95,11 @@ void CudaSparseMatrix::CopyFrom(const CompressedRowSparseMatrix& crs_matrix) {
   num_rows_ = crs_matrix.num_rows();
   num_cols_ = crs_matrix.num_cols();
   num_nonzeros_ = crs_matrix.num_nonzeros();
-  csr_row_indices_.CopyFromCpuAsync(
+  csr_row_indices_.CopyFromCpu(
       crs_matrix.rows(), num_rows_ + 1, context_->stream_);
-  csr_col_indices_.CopyFromCpuAsync(
+  csr_col_indices_.CopyFromCpu(
       crs_matrix.cols(), num_nonzeros_, context_->stream_);
-  csr_values_.CopyFromCpuAsync(
+  csr_values_.CopyFromCpu(
       crs_matrix.values(), num_nonzeros_, context_->stream_);
   DestroyDescriptor();
   cusparseCreateCsr(&csr_descr_,
