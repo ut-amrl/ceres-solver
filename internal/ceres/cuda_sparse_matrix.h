@@ -39,6 +39,7 @@
 // clang-format on
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "ceres/block_sparse_matrix.h"
@@ -61,6 +62,10 @@ class CERES_NO_EXPORT CudaSparseMatrix : public CudaLinearOperator {
  public:
   CudaSparseMatrix() {};
 
+  static std::unique_ptr<CudaSparseMatrix> Create(
+      ContextImpl* context,
+      const CompressedRowSparseMatrix& crs_matrix);
+
   bool Init(ContextImpl* context, std::string* message);
 
   // y = y + Ax;
@@ -76,6 +81,7 @@ class CERES_NO_EXPORT CudaSparseMatrix : public CudaLinearOperator {
   void CopyFrom(const BlockSparseMatrix& bs_matrix);
   void CopyFrom(const TripletSparseMatrix& ts_matrix);
   void CopyFrom(const CompressedRowSparseMatrix& crs_matrix);
+  void CopyValues(const CompressedRowSparseMatrix& crs_matrix);
 
   // Set this matrix as the transpose of the other given matrix.
   void CopyFromTranspose(const CudaSparseMatrix& other);
@@ -88,6 +94,9 @@ class CERES_NO_EXPORT CudaSparseMatrix : public CudaLinearOperator {
   void Multiply(const CudaSparseMatrix& A, const CudaSparseMatrix& B);
 
  private:
+  CudaSparseMatrix(ContextImpl* context,
+                   const CompressedRowSparseMatrix& crs_matrix);
+
   // Disable copy and assignment.
   CudaSparseMatrix(const CudaSparseMatrix&) = delete;
   CudaSparseMatrix& operator=(const CudaSparseMatrix&) = delete;

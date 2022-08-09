@@ -132,7 +132,7 @@ LinearSolver::Summary CudaConjugateGradientsSolver::Solve(
   // Initial value of the quadratic model Q = x'Ax - 2 * b'x.
   // tmp = r
   //     = b - A * x.
-  tmp_.CopyFrom(r_);
+  tmp_.CopyFromCpu(r_);
   if (kDebug) printf("tmp = r\n");
   // tmp = b + tmp.
   //     = 2 * b + A * x.
@@ -152,7 +152,7 @@ LinearSolver::Summary CudaConjugateGradientsSolver::Solve(
     if (preconditioner != nullptr) {
       preconditioner->Apply(r_, &z_);
     } else {
-      z_.CopyFrom(r_);
+      z_.CopyFromCpu(r_);
     }
 
     double last_rho = rho;
@@ -166,7 +166,7 @@ LinearSolver::Summary CudaConjugateGradientsSolver::Solve(
     }
 
     if (summary.num_iterations == 1) {
-      p_.CopyFrom(z_);
+      p_.CopyFromCpu(z_);
     } else {
       double beta = rho / last_rho;
       if (IsZeroOrInfinity(beta)) {
@@ -238,7 +238,7 @@ LinearSolver::Summary CudaConjugateGradientsSolver::Solve(
     // Updated quadratic model Q1 = x'Ax - 2 * b' x.
     // tmp = r
     //     = b - A * x.
-    tmp_.CopyFrom(r_);
+    tmp_.CopyFromCpu(r_);
     // tmp = b + tmp.
     //     = 2 * b + A * x.
     tmp_.Axpy(1.0, b);

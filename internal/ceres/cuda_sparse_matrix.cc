@@ -38,6 +38,7 @@
 #include "ceres/cuda_sparse_matrix.h"
 
 #include <math.h>
+#include <memory>
 
 #include "ceres/internal/export.h"
 #include "ceres/block_sparse_matrix.h"
@@ -56,6 +57,23 @@
 
 
 namespace ceres::internal {
+
+std::unique_ptr<CudaSparseMatrix> CudaSparseMatrix::Create(
+      ContextImpl* context,
+      const CompressedRowSparseMatrix& crs_matrix) {
+  if (context == nullptr || !context->InitCUDA(nullptr)) {
+    return nullptr;
+  }
+  return std::unique_ptr<CudaSparseMatrix>(
+      new CudaSparseMatrix(context, crs_matrix));
+}
+
+CudaSparseMatrix::CudaSparseMatrix(
+      ContextImpl* context,
+      const CompressedRowSparseMatrix& crs_matrix) :
+    context_(context) {
+  CopyFrom(crs_matrix);
+}
 
 bool CudaSparseMatrix::Init(ContextImpl* context, std::string* message) {
   if (context == nullptr) {
@@ -113,6 +131,17 @@ void CudaSparseMatrix::CopyFrom(const CompressedRowSparseMatrix& crs_matrix) {
                     CUSPARSE_INDEX_32I,
                     CUSPARSE_INDEX_BASE_ZERO,
                     CUDA_R_64F);
+}
+
+void CudaSparseMatrix::CopyValues(const CompressedRowSparseMatrix& crs_matrix) {
+  // There is no quick and easy way to verify that the structure is unchanged,
+  // but at least we can check that the size of the matrix and the number of
+  // nonzeros is unchanged.
+  CHECK_EQ(num_rows_, crs_matrix.num_rows());
+  CHECK_EQ(num_cols_, crs_matrix.num_cols());
+  CHECK_EQ(num_nonzeros_, crs_matrix.num_nonzeros());
+  csr_values_.CopyFromCpu(
+      crs_matrix.values(), num_nonzeros_, context_->stream_);
 }
 
 void CudaSparseMatrix::Resize(int num_rows, int num_cols, int num_nnz) {

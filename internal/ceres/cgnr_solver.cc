@@ -193,6 +193,7 @@ CudaCgnrSolver::~CudaCgnrSolver() = default;
 bool CudaCgnrSolver::Init(
     const LinearSolver::Options& options, std::string* error) {
   options_ = options;
+  context_ = options.context;
   solver_ = CudaConjugateGradientsSolver::Create(options);
   if (solver_ == nullptr) {
     *error = "CudaConjugateGradientsSolver::Create failed.";
@@ -232,26 +233,30 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
   summary.num_iterations = 0;
   summary.termination_type = LinearSolverTerminationType::FATAL_ERROR;
 
-  CudaSparseMatrix cuda_A;
-  CudaVector cuda_b;
-  CudaVector cuda_z;
-  CudaVector cuda_x;
-  CudaVector cuda_D;
-  if (!cuda_A.Init(options_.context, &summary.message) ||
-      !cuda_b.Init(options_.context, &summary.message) ||
-      !cuda_z.Init(options_.context, &summary.message) ||
-      !cuda_x.Init(options_.context, &summary.message) ||
-      !cuda_D.Init(options_.context, &summary.message)) {
-    return summary;
+  if (A_ == nullptr) {
+    // Assume structure is not cached, do an initialization and structural copy.
+    A_ = CudaSparseMatrix::Create(options_.context, *A);
+    b_ = CudaVector::Create(options_.context, A->num_rows());
+    x_ = CudaVector::Create(options_.context, A->num_cols());
+    z_ = CudaVector::Create(options_.context, A->num_cols());
+    D_ = CudaVector::Create(options_.context, A->num_cols());
+    if (A_ == nullptr ||
+        b_ == nullptr ||
+        x_ == nullptr ||
+        z_ == nullptr ||
+        D_ == nullptr) {
+      summary.message = "Cuda Matrix or Vector initialization failed.";
+      return summary;
+    }
+    event_logger.AddEvent("Initialize");
+  } else {
+    // Assume structure is cached, do a value copy.
+    A_->CopyValues(*A);
   }
-  event_logger.AddEvent("Initialize");
 
-  cuda_A.CopyFrom(*A);
   event_logger.AddEvent("A CPU to GPU Transfer");
-  cuda_b.CopyFrom(b, A->num_rows());
-  cuda_z.resize(A->num_cols());
-  cuda_x.resize(A->num_cols());
-  cuda_D.CopyFrom(per_solve_options.D, A->num_cols());
+  b_->CopyFromCpu(b, A->num_rows());
+  D_->CopyFromCpu(per_solve_options.D, A->num_cols());
   event_logger.AddEvent("b CPU to GPU Transfer");
 
   std::unique_ptr<CudaPreconditioner> preconditioner(nullptr);
@@ -259,21 +264,21 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
     preconditioner = std::make_unique<CudaIncompleteCholeskyPreconditioner>();
     std::string message;
     CHECK(preconditioner->Init(options_.context, &message));
-    CHECK(preconditioner->Update(cuda_A, cuda_D));
+    CHECK(preconditioner->Update(*A_, *D_));
   }
 
   event_logger.AddEvent("Preconditioner Update");
   // Form z = Atb.
-  cuda_z.setZero();
-  cuda_A.LeftMultiply(cuda_b, &cuda_z);
+  z_->setZero();
+  A_->LeftMultiply(*b_, z_.get());
   if (kDebug) printf("z = Atb\n");
 
   LinearSolver::PerSolveOptions cg_per_solve_options = per_solve_options;
   cg_per_solve_options.preconditioner = nullptr;
 
   // Solve (AtA + DtD)x = z (= Atb).
-  cuda_x.setZero();
-  if (!lhs_.Init(&cuda_A, &cuda_D, options_.context, &summary.message)) {
+  x_->setZero();
+  if (!lhs_.Init(A_.get(), D_.get(), options_.context, &summary.message)) {
     summary.termination_type = LinearSolverTerminationType::FATAL_ERROR;
     return summary;
   }
@@ -282,8 +287,8 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
   if (kDebug) printf("Solve (AtA + DtD)x = z (= Atb)\n");
 
   summary = solver_->Solve(
-      &lhs_, preconditioner.get(), cuda_z, cg_per_solve_options, &cuda_x);
-  cuda_x.CopyTo(x);
+      &lhs_, preconditioner.get(), *z_, cg_per_solve_options, x_.get());
+  x_->CopyTo(x);
   event_logger.AddEvent("Solve");
   return summary;
 }

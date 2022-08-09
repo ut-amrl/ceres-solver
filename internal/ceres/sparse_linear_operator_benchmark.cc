@@ -172,8 +172,8 @@ static void BM_CudaRightMultiply(benchmark::State& state) {
   y.setRandom();
 
   cuda_jacobian.CopyFrom(*jacobian);
-  cuda_x.CopyFrom(x);
-  cuda_y.CopyFrom(y);
+  cuda_x.CopyFromCpu(x);
+  cuda_y.CopyFromCpu(y);
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed
@@ -208,8 +208,8 @@ static void BM_CudaLeftMultiply(benchmark::State& state) {
   y.setRandom();
 
   cuda_jacobian.CopyFrom(*jacobian);
-  cuda_x.CopyFrom(x);
-  cuda_y.CopyFrom(y);
+  cuda_x.CopyFromCpu(x);
+  cuda_y.CopyFromCpu(y);
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed

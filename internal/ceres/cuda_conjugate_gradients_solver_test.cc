@@ -75,7 +75,7 @@ TEST(CudaConjugateGradientsSolver, Solves3x3IdentitySystem) {
   A.CopyFrom(triplet_matrix);
   Vector b_cpu(3);
   b_cpu.setConstant(2.0);
-  b.CopyFrom(b_cpu);
+  b.CopyFromCpu(b_cpu);
 
   LinearSolver::PerSolveOptions per_solve_options;
 
@@ -120,7 +120,7 @@ TEST(CudaConjugateGradientsSolver, Solves3x3SymmetricSystem) {
   b_cpu(0) = -1;
   b_cpu(1) = 0;
   b_cpu(2) = 3;
-  b.CopyFrom(b_cpu);
+  b.CopyFromCpu(b_cpu);
 
   LinearSolver::PerSolveOptions per_solve_options;
   per_solve_options.r_tolerance = 1e-9;

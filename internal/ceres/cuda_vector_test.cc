@@ -62,7 +62,7 @@ TEST(CUDAVector, CopyVector) {
   ContextImpl context;
   std::string message;
   EXPECT_TRUE(y.Init(&context, &message));
-  y.CopyFrom(x);
+  y.CopyFromCpu(x);
   EXPECT_EQ(y.num_rows(), 3);
 
   Vector z(3);
@@ -72,7 +72,7 @@ TEST(CUDAVector, CopyVector) {
 
   CudaVector y_copy;
   y_copy.Init(&context, &message);
-  y_copy.CopyFrom(y);
+  y_copy.CopyFromCpu(y);
   EXPECT_EQ(y_copy.num_rows(), 3);
   y_copy.CopyTo(&z);
   EXPECT_EQ(x, z);
@@ -85,7 +85,7 @@ TEST(CUDAVector, CopyMemory) {
   ContextImpl context;
   std::string message;
   EXPECT_TRUE(y.Init(&context, &message));
-  y.CopyFrom(x.data(), x.rows());
+  y.CopyFromCpu(x.data(), x.rows());
   EXPECT_EQ(y.num_rows(), 3);
 
   Vector z(3);
@@ -105,8 +105,8 @@ TEST(CUDAVector, Dot) {
   std::string message;
   EXPECT_TRUE(x_gpu.Init(&context, &message));
   EXPECT_TRUE(y_gpu.Init(&context, &message));
-  x_gpu.CopyFrom(x);
-  y_gpu.CopyFrom(y);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
 
   EXPECT_EQ(x_gpu.dot(y_gpu), 123.0);
 }
@@ -118,7 +118,7 @@ TEST(CUDAVector, Norm) {
   ContextImpl context;
   std::string message;
   EXPECT_TRUE(x_gpu.Init(&context, &message));
-  x_gpu.CopyFrom(x);
+  x_gpu.CopyFromCpu(x);
 
   EXPECT_NEAR(x_gpu.norm(),
               sqrt(1.0 + 4.0 + 9.0),
@@ -132,7 +132,7 @@ TEST(CUDAVector, SetZero) {
   ContextImpl context;
   std::string message;
   EXPECT_TRUE(x_gpu.Init(&context, &message));
-  x_gpu.CopyFrom(x);
+  x_gpu.CopyFromCpu(x);
 
   EXPECT_NEAR(x_gpu.norm(),
               2.0,
@@ -165,8 +165,8 @@ TEST(CUDAVector, Axpy) {
   std::string message;
   EXPECT_TRUE(x_gpu.Init(&context, &message));
   EXPECT_TRUE(y_gpu.Init(&context, &message));
-  x_gpu.CopyFrom(x);
-  y_gpu.CopyFrom(y);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
 
   x_gpu.Axpy(2.0, y_gpu);
   Vector result;
@@ -187,8 +187,8 @@ TEST(CUDAVector, Axpby) {
   std::string message;
   EXPECT_TRUE(x_gpu.Init(&context, &message));
   EXPECT_TRUE(y_gpu.Init(&context, &message));
-  x_gpu.CopyFrom(x);
-  y_gpu.CopyFrom(y);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
 
   x_gpu.Axpby(2.0, y_gpu, 3.0);
   Vector result;
@@ -213,9 +213,9 @@ TEST(CUDAVector, DtDxpy) {
   EXPECT_TRUE(x_gpu.Init(&context, &message));
   EXPECT_TRUE(y_gpu.Init(&context, &message));
   EXPECT_TRUE(D_gpu.Init(&context, &message));
-  x_gpu.CopyFrom(x);
-  y_gpu.CopyFrom(y);
-  D_gpu.CopyFrom(D);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
+  D_gpu.CopyFromCpu(D);
 
   y_gpu.DtDxpy(D_gpu, x_gpu);
   Vector result;

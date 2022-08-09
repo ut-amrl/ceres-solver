@@ -90,11 +90,11 @@ TEST_F(CudaSparseMatrixTest, RightMultiplyTest) {
   EXPECT_TRUE(x_gpu.Init(&context_, &message));
   EXPECT_TRUE(res_gpu.Init(&context_, &message));
   A_gpu.CopyFrom(*A_);
-  x_gpu.CopyFrom(x_);
+  x_gpu.CopyFromCpu(x_);
 
   Vector minus_b = -b_;
   // res = -b
-  res_gpu.CopyFrom(minus_b);
+  res_gpu.CopyFromCpu(minus_b);
   // res += A * x
   A_gpu.RightMultiply(x_gpu, &res_gpu);
 
@@ -135,7 +135,7 @@ TEST(CudaSparseMatrix, RightMultiplyTest) {
   EXPECT_TRUE(b_gpu.Init(&context, &message));
   EXPECT_TRUE(x_gpu.Init(&context, &message));
   A_gpu.CopyFrom(A);
-  b_gpu.CopyFrom(b);
+  b_gpu.CopyFromCpu(b);
   x_gpu.resize(2);
   x_gpu.setZero();
 
@@ -174,7 +174,7 @@ TEST(CudaSparseMatrix, LeftMultiplyTest) {
   EXPECT_TRUE(b_gpu.Init(&context, &message));
   EXPECT_TRUE(x_gpu.Init(&context, &message));
   A_gpu.CopyFrom(A);
-  b_gpu.CopyFrom(b);
+  b_gpu.CopyFromCpu(b);
   x_gpu.resize(4);
   x_gpu.setZero();
 
@@ -229,7 +229,7 @@ TEST(CudaSparseMatrix, LargeMultiplyTest) {
   EXPECT_TRUE(x_gpu.Init(&context, &message));
   A_gpu.CopyFrom(A);
   b_gpu.resize(N);
-  x_gpu.CopyFrom(x);
+  x_gpu.CopyFromCpu(x);
 
   // First check RightMultiply.
   {

@@ -50,6 +50,18 @@
 
 namespace ceres::internal {
 
+std::unique_ptr<CudaVector> CudaVector::Create(ContextImpl* context, int size) {
+  if (context == nullptr || !context->InitCUDA(nullptr)) {
+    return nullptr;
+  }
+  return std::unique_ptr<CudaVector>(new CudaVector(context, size));
+}
+
+CudaVector::CudaVector(ContextImpl* context, int size) :
+    context_(context) {
+  resize(size);
+}
+
 bool CudaVector::Init(ContextImpl* context, std::string* message) {
   CHECK(message != nullptr);
   if (context == nullptr) {
@@ -96,7 +108,7 @@ double CudaVector::norm() const {
   return result;
 }
 
-void CudaVector::CopyFrom(const Vector& x) {
+void CudaVector::CopyFromCpu(const Vector& x) {
   data_.Reserve(x.rows());
   data_.CopyFromCpu(x.data(), x.rows(), context_->stream_);
   num_rows_ = x.rows();
@@ -106,7 +118,7 @@ void CudaVector::CopyFrom(const Vector& x) {
                       CUDA_R_64F);
 }
 
-void CudaVector::CopyFrom(const double* x, int size) {
+void CudaVector::CopyFromCpu(const double* x, int size) {
   data_.Reserve(size);
   data_.CopyFromCpu(x, size, context_->stream_);
   num_rows_ = size;
@@ -133,7 +145,7 @@ void CudaVector::CopyTo(double* x) const {
   data_.CopyToCpu(x, num_rows_);
 }
 
-void CudaVector::CopyFrom(const CudaVector& x) {
+void CudaVector::CopyFromCpu(const CudaVector& x) {
   data_.CopyNItemsFrom(x.num_rows_, x.data(), context_->stream_);
   num_rows_ = x.num_rows_;
   cusparseCreateDnVec(&cusparse_descr_,

@@ -39,6 +39,7 @@
 // clang-format on
 
 #include <math.h>
+#include <memory>
 #include <string>
 
 #include "ceres/internal/export.h"
@@ -61,6 +62,10 @@ class CERES_NO_EXPORT CudaVector {
   CudaVector() = default;
   ~CudaVector() = default;
 
+  static std::unique_ptr<CudaVector> Create(ContextImpl* context, int size);
+
+  CudaVector(ContextImpl* context, int size);
+
   bool Init(ContextImpl* context, std::string* message);
 
   void resize(int size);
@@ -75,13 +80,13 @@ class CERES_NO_EXPORT CudaVector {
   void setZero();
 
   // Set y = x.
-  void CopyFrom(const CudaVector& x);
+  void CopyFromCpu(const CudaVector& x);
 
   // Copy from Eigen vector.
-  void CopyFrom(const Vector& x);
+  void CopyFromCpu(const Vector& x);
 
   // Copy from CPU memory array.
-  void CopyFrom(const double* x, int size);
+  void CopyFromCpu(const double* x, int size);
 
   // Copy to Eigen vector.
   void CopyTo(Vector* x) const;
