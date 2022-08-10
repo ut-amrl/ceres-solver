@@ -29,10 +29,16 @@
 // Author: joydeepb@cs.utexas.edu (Joydeep Biswas)
 
 #include "ceres/experimental_custom_solver.h"
-#include "ceres/cgnr_solver.h"
 
+
+#include <iostream>
 #include <memory>
 
+#include "Eigen/Sparse"
+
+#include "ceres/cgnr_solver.h"
+#include "ceres/block_sparse_matrix.h"
+#include "ceres/triplet_sparse_matrix.h"
 #include "ceres/internal/export.h"
 #include "ceres/linear_solver.h"
 
@@ -49,11 +55,26 @@ LinearSolver::Summary ExperimentalCustomSolver::SolveImpl(
   summary.num_iterations = 0;
   ConstVectorRef b(b_ptr, A->num_cols());
 
+  TripletSparseMatrix A_ts;
+  A->ToTripletSparseMatrix(&A_ts);
+  std::vector<Eigen::Triplet<double>> triplets(A_ts.num_nonzeros());
+  for (int i = 0; i < A_ts.num_nonzeros(); ++i) {
+    triplets[i] = Eigen::Triplet<double>(
+        A_ts.rows()[i], A_ts.cols()[i], A_ts.values()[i]);
+  }
+  Eigen::SparseMatrix<double, Eigen::RowMajor> A_eigen(
+      A->num_rows(), A->num_cols());
+  A_eigen.setFromTriplets(triplets.begin(), triplets.end());
+  Eigen::SparseMatrix<float, Eigen::RowMajor> A_eigen_float(
+    A->num_rows(), A->num_cols());
+  A_eigen_float = A_eigen.cast<float>();
   if (false) {
     // Just to test that the plumbing works, you can try this.
     CgnrSolver solver(options_);
     return solver.SolveImpl(A, b_ptr, per_solve_options, x);
   }
+  // std::cout << "A = \n" << A_eigen << "\n";
+
   // TODO: Actually solve the problem, and set summary.termination_type to
   // something that is not FATAL_ERROR.
   return summary;
