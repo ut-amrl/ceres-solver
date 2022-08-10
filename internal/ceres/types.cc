@@ -59,6 +59,7 @@ const char* LinearSolverTypeToString(LinearSolverType type) {
     CASESTR(SPARSE_SCHUR);
     CASESTR(ITERATIVE_SCHUR);
     CASESTR(CGNR);
+    CASESTR(EXPERIMENTAL_CUSTOM_SOLVER);
     default:
       return "UNKNOWN";
   }
@@ -73,6 +74,7 @@ bool StringToLinearSolverType(string value, LinearSolverType* type) {
   STRENUM(SPARSE_SCHUR);
   STRENUM(ITERATIVE_SCHUR);
   STRENUM(CGNR);
+  STRENUM(EXPERIMENTAL_CUSTOM_SOLVER);
   return false;
 }
 

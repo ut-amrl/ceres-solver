@@ -41,8 +41,74 @@
 
 DEFINE_string(input, "", "The pose graph definition filename in g2o format.");
 
+DEFINE_string(linear_solver, "sparse_schur", "Options are: "
+              "sparse_schur, dense_schur, iterative_schur, sparse_normal_cholesky, "
+              "dense_qr, dense_normal_cholesky, cgnr, and "
+              "experimental_custom_solver");
+DEFINE_string(preconditioner, "jacobi", "Options are: "
+              "identity, jacobi, schur_jacobi, cluster_jacobi, "
+              "cluster_tridiagonal.");
+DEFINE_int32(num_iterations, 5, "Number of iterations.");
+DEFINE_bool(mixed_precision_solves, false, "Use mixed precision solves.");
+DEFINE_bool(line_search, false, "Use a line search instead of trust region "
+            "algorithm.");
+DEFINE_int32(num_threads, 1, "Number of threads.");
+DEFINE_double(max_solver_time, 1e32, "Maximum solve time in seconds.");
+DEFINE_bool(nonmonotonic_steps, false, "Trust region algorithm can use"
+            " nonmonotic steps.");
+DEFINE_int32(max_num_refinement_iterations, 0,
+             "Iterative refinement iterations");
+DEFINE_string(trust_region_strategy, "levenberg_marquardt",
+              "Options are: levenberg_marquardt, dogleg.");
+DEFINE_string(dogleg, "traditional_dogleg", "Options are: traditional_dogleg,"
+              "subspace_dogleg.");
+DEFINE_bool(inner_iterations, false, "Use inner iterations to non-linearly "
+            "refine each successful trust region step.");
 namespace ceres::examples {
 namespace {
+
+void SetOptions(Solver::Options* options) {
+  CHECK(StringToLinearSolverType(CERES_GET_FLAG(FLAGS_linear_solver),
+                                 &options->linear_solver_type));
+  CHECK(StringToPreconditionerType(CERES_GET_FLAG(FLAGS_preconditioner),
+                                   &options->preconditioner_type));
+  // CHECK(StringToVisibilityClusteringType(
+  //     CERES_GET_FLAG(FLAGS_visibility_clustering),
+  //     &options->visibility_clustering_type));
+  // CHECK(StringToSparseLinearAlgebraLibraryType(
+  //     CERES_GET_FLAG(FLAGS_sparse_linear_algebra_library),
+  //     &options->sparse_linear_algebra_library_type));
+  // CHECK(StringToDenseLinearAlgebraLibraryType(
+  //     CERES_GET_FLAG(FLAGS_dense_linear_algebra_library),
+  //     &options->dense_linear_algebra_library_type));
+  // CHECK(
+  //     StringToLinearSolverOrderingType(CERES_GET_FLAG(FLAGS_ordering_type),
+  //                                      &options->linear_solver_ordering_type));
+  // options->use_explicit_schur_complement =
+  //     CERES_GET_FLAG(FLAGS_explicit_schur_complement);
+  options->use_mixed_precision_solves =
+      CERES_GET_FLAG(FLAGS_mixed_precision_solves);
+  options->max_num_refinement_iterations =
+      CERES_GET_FLAG(FLAGS_max_num_refinement_iterations);
+
+
+  options->max_num_iterations = CERES_GET_FLAG(FLAGS_num_iterations);
+  options->minimizer_progress_to_stdout = true;
+  options->num_threads = CERES_GET_FLAG(FLAGS_num_threads);
+  // options->eta = CERES_GET_FLAG(FLAGS_eta);
+  // options->max_solver_time_in_seconds = CERES_GET_FLAG(FLAGS_max_solver_time);
+  // options->use_nonmonotonic_steps = CERES_GET_FLAG(FLAGS_nonmonotonic_steps);
+  if (CERES_GET_FLAG(FLAGS_line_search)) {
+    options->minimizer_type = ceres::LINE_SEARCH;
+  }
+
+  CHECK(StringToTrustRegionStrategyType(
+      CERES_GET_FLAG(FLAGS_trust_region_strategy),
+      &options->trust_region_strategy_type));
+  CHECK(
+      StringToDoglegType(CERES_GET_FLAG(FLAGS_dogleg), &options->dogleg_type));
+  options->use_inner_iterations = CERES_GET_FLAG(FLAGS_inner_iterations);
+}
 
 // Constructs the nonlinear least squares optimization problem from the pose
 // graph constraints.
@@ -107,6 +173,7 @@ bool SolveOptimizationProblem(ceres::Problem* problem) {
   options.max_num_iterations = 200;
   options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
 
+  SetOptions(&options);
   ceres::Solver::Summary summary;
   ceres::Solve(options, problem, &summary);
 

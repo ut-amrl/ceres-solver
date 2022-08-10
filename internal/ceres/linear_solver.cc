@@ -36,6 +36,7 @@
 #include "ceres/dense_normal_cholesky_solver.h"
 #include "ceres/dense_qr_solver.h"
 #include "ceres/dynamic_sparse_normal_cholesky_solver.h"
+#include "ceres/experimental_custom_solver.h"
 #include "ceres/internal/config.h"
 #include "ceres/iterative_schur_complement_solver.h"
 #include "ceres/schur_complement_solver.h"
@@ -112,6 +113,9 @@ std::unique_ptr<LinearSolver> LinearSolver::Create(
 
     case DENSE_NORMAL_CHOLESKY:
       return std::make_unique<DenseNormalCholeskySolver>(options);
+
+    case EXPERIMENTAL_CUSTOM_SOLVER:
+      return std::make_unique<ExperimentalCustomSolver>(options);
 
     default:
       LOG(FATAL) << "Unknown linear solver type :" << options.type;

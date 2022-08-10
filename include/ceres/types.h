@@ -87,7 +87,10 @@ enum LinearSolverType {
   ITERATIVE_SCHUR,
 
   // Conjugate gradients on the normal equations.
-  CGNR
+  CGNR,
+
+  // Experimental custom solver.
+  EXPERIMENTAL_CUSTOM_SOLVER
 };
 
 enum PreconditionerType {

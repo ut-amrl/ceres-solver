@@ -210,6 +210,7 @@ add_library(ceres_internal OBJECT
     dynamic_compressed_row_jacobian_writer.cc
     dynamic_compressed_row_sparse_matrix.cc
     dynamic_sparse_normal_cholesky_solver.cc
+    experimental_custom_solver.cc
     eigensparse.cc
     evaluation_callback.cc
     evaluator.cc

@@ -82,7 +82,8 @@ DEFINE_string(blocks_for_inner_iterations, "automatic", "Options are: "
 
 DEFINE_string(linear_solver, "sparse_schur", "Options are: "
               "sparse_schur, dense_schur, iterative_schur, sparse_normal_cholesky, "
-              "dense_qr, dense_normal_cholesky and cgnr.");
+              "dense_qr, dense_normal_cholesky, cgnr, and "
+              "experimental_custom_solver");
 DEFINE_bool(explicit_schur_complement, false, "If using ITERATIVE_SCHUR "
             "then explicitly compute the Schur complement.");
 DEFINE_string(preconditioner, "jacobi", "Options are: "
