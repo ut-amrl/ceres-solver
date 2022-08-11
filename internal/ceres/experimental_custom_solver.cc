@@ -35,6 +35,7 @@
 #include <memory>
 
 #include "Eigen/Sparse"
+#include "Eigen/SparseCholesky"
 
 #include "ceres/cgnr_solver.h"
 #include "ceres/block_sparse_matrix.h"
@@ -68,11 +69,19 @@ LinearSolver::Summary ExperimentalCustomSolver::SolveImpl(
   Eigen::SparseMatrix<float, Eigen::RowMajor> A_eigen_float(
     A->num_rows(), A->num_cols());
   A_eigen_float = A_eigen.cast<float>();
-  if (false) {
+  if (true) {
+    // printf("D = %.30f\n", per_solve_options.D[0]);
+    for (int i = 0; i < A->num_cols(); ++i) {
+      per_solve_options.D[i] += 1e-3;
+    }
+    printf("D = %.30f\n", per_solve_options.D[0]);
     // Just to test that the plumbing works, you can try this.
     CgnrSolver solver(options_);
     return solver.SolveImpl(A, b_ptr, per_solve_options, x);
   }
+  // Eigen::SimplicialLLT<Eigen::SparseMatrix<float>> llt(A_eigen_float);
+  // llt.analyzePattern();
+  // llt.compute();
   // std::cout << "A = \n" << A_eigen << "\n";
 
   // TODO: Actually solve the problem, and set summary.termination_type to
