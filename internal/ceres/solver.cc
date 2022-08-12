@@ -861,13 +861,22 @@ string Solver::Summary::FullReport() const {
           preconditioner_type_used == CLUSTER_TRIDIAGONAL))) {
       const char* mixed_precision_suffix =
           (mixed_precision_solves_used ? "(Mixed Precision)" : "");
-      StringAppendF(
-          &report,
-          "\nSparse linear algebra library %15s + %s %s\n",
-          SparseLinearAlgebraLibraryTypeToString(
-              sparse_linear_algebra_library_type),
-          LinearSolverOrderingTypeToString(linear_solver_ordering_type),
-          mixed_precision_suffix);
+      if (sparse_linear_algebra_library_type == CUDA_SPARSE) {
+        StringAppendF(
+            &report,
+            "\nSparse linear algebra library %15s %s\n",
+            SparseLinearAlgebraLibraryTypeToString(
+                sparse_linear_algebra_library_type),
+            mixed_precision_suffix);
+      } else {
+        StringAppendF(
+            &report,
+            "\nSparse linear algebra library %15s + %s %s\n",
+            SparseLinearAlgebraLibraryTypeToString(
+                sparse_linear_algebra_library_type),
+            LinearSolverOrderingTypeToString(linear_solver_ordering_type),
+            mixed_precision_suffix);
+      }
     }
 
     StringAppendF(&report, "\n");

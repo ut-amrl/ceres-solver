@@ -169,10 +169,11 @@ LinearSolver::Summary ConjugateGradientsSolver(
       break;
     }
 
+    double beta = 0;
     if (summary.num_iterations == 1) {
       Copy(z, p);
     } else {
-      double beta = rho / last_rho;
+      beta = rho / last_rho;
       if (IsZeroOrInfinity(beta)) {
         summary.termination_type = LinearSolverTerminationType::FAILURE;
         summary.message = StringPrintf(
@@ -213,6 +214,7 @@ LinearSolver::Summary ConjugateGradientsSolver(
       break;
     }
 
+    // printf("||r|| = %e alpha = %f beta = %f\n", norm_r, alpha, beta);
     // solution = solution + alpha * p;
     Axpby(1.0, solution, alpha, p, solution);
 

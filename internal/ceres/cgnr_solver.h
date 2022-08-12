@@ -99,11 +99,11 @@ class CERES_NO_EXPORT CudaCgnrSolver final : public CompressedRowSparseMatrixSol
 
   ContextImpl* context_;
   LinearSolver::Options options_;
-  std::unique_ptr<CudaConjugateGradientsSolver> solver_ = nullptr;
   std::unique_ptr<CudaSparseMatrix> A_;
   std::unique_ptr<CudaVector> b_;
   std::unique_ptr<CudaVector> x_;
-  std::unique_ptr<CudaVector> z_;
+  std::unique_ptr<CudaVector> Atb_;
+  std::unique_ptr<CudaVector> Ax_;
   std::unique_ptr<CudaVector> D_;
   std::unique_ptr<CudaVector> scratch_[4];
 };

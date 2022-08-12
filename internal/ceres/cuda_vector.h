@@ -139,8 +139,17 @@ inline void Axpby(
     double b,
     const CudaVector& y,
     CudaVector& z) {
-  z = y;
-  z.Axpby(a, x, b);
+  CHECK_NE(&x, &y);
+  if (&x == &z) {
+    // x is also the output vector.
+    z.Axpby(b, y, a);
+  } else if (&y == &z) {
+    // y is also the output vector.
+    z.Axpby(a, x, b);
+  } else {
+    z = y;
+    z.Axpby(a, x, b);
+  }
 }
 inline double Dot(const CudaVector& x, const CudaVector& y) { return x.dot(y); }
 inline void Copy(const CudaVector& from, CudaVector& to) { to = from; }

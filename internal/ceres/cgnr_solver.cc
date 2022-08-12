@@ -200,19 +200,6 @@ LinearSolver::Summary CgnrSolver::SolveImpl(
 class CERES_NO_EXPORT CudaCgnrLinearOperator final : public
     ConjugateGradientsLinearOperator<CudaVector> {
  public:
-
-  static std::unique_ptr<CudaCgnrLinearOperator> Create(
-      CudaSparseMatrix& A,
-      CudaVector* D,
-      CudaVector* z,
-      ContextImpl* context) {
-    if (context == nullptr || !context->InitCUDA(nullptr)) {
-      return nullptr;
-    }
-    return std::unique_ptr<CudaCgnrLinearOperator>(
-        new CudaCgnrLinearOperator(A, D, z));
-  }
-
   CudaCgnrLinearOperator(CudaSparseMatrix& A,
                          CudaVector* D,
                          CudaVector* z) : A_(A), D_(D), z_(z) {}
@@ -242,7 +229,8 @@ class CERES_NO_EXPORT CudaIdentityPreconditioner final : public
     ConjugateGradientsLinearOperator<CudaVector> {
  public:
   void RightMultiply(const CudaVector& x, CudaVector& y) final {
-    y.Axpby(1.0, x, 1.0);
+    // y.Axpby(1.0, x, 1.0);
+    y = x;
   }
 };
 
@@ -254,15 +242,6 @@ bool CudaCgnrSolver::Init(
     const LinearSolver::Options& options, std::string* error) {
   options_ = options;
   context_ = options.context;
-  solver_ = CudaConjugateGradientsSolver::Create(options);
-  if (solver_ == nullptr) {
-    *error = "CudaConjugateGradientsSolver::Create failed.";
-    return false;
-
-  }
-  if (!solver_->Init(options.context, error)) {
-    return false;
-  }
   return true;
 }
 
@@ -298,12 +277,14 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
     A_ = CudaSparseMatrix::Create(options_.context, *A);
     b_ = CudaVector::Create(options_.context, A->num_rows());
     x_ = CudaVector::Create(options_.context, A->num_cols());
-    z_ = CudaVector::Create(options_.context, A->num_cols());
+    Atb_ = CudaVector::Create(options_.context, A->num_cols());
+    Ax_ = CudaVector::Create(options_.context, A->num_rows());
     D_ = CudaVector::Create(options_.context, A->num_cols());
     if (A_ == nullptr ||
         b_ == nullptr ||
         x_ == nullptr ||
-        z_ == nullptr ||
+        Atb_ == nullptr ||
+        Ax_ == nullptr ||
         D_ == nullptr) {
       summary.message = "Cuda Matrix or Vector initialization failed.";
       return summary;
@@ -319,16 +300,15 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
   } else {
     // Assume structure is cached, do a value copy.
     A_->CopyValues(*A);
+    event_logger.AddEvent("A CPU to GPU Transfer");
   }
-
-  event_logger.AddEvent("A CPU to GPU Transfer");
   b_->CopyFromCpu(b, A->num_rows());
   D_->CopyFromCpu(per_solve_options.D, A->num_cols());
   event_logger.AddEvent("b CPU to GPU Transfer");
 
   // Form z = Atb.
-  z_->setZero();
-  A_->LeftMultiply(*b_, z_.get());
+  Atb_->setZero();
+  A_->LeftMultiply(*b_, Atb_.get());
   if (kDebug) printf("z = Atb\n");
 
   LinearSolver::PerSolveOptions cg_per_solve_options = per_solve_options;
@@ -336,12 +316,7 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
 
   // Solve (AtA + DtD)x = z (= Atb).
   x_->setZero();
-  auto lhs = CudaCgnrLinearOperator::Create(
-      *A_, D_.get(), z_.get(), options_.context);
-  if (lhs == nullptr) {
-    summary.message = "CudaCgnrLinearOperator::Create failed.";
-    return summary;
-  }
+  CudaCgnrLinearOperator lhs(*A_, D_.get(), Ax_.get());
 
   event_logger.AddEvent("Setup");
   if (kDebug) printf("Solve (AtA + DtD)x = z (= Atb)\n");
@@ -359,8 +334,8 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
 
   CudaIdentityPreconditioner preconditioner;
   summary = ConjugateGradientsSolver(
-      cg_options, *lhs, *z_, preconditioner, scratch_ptr, *x_);
-
+      cg_options, lhs, *Atb_, preconditioner, scratch_ptr, *x_);
+  // printf("summary: %s\n", summary.message.c_str());
   x_->CopyTo(x);
   event_logger.AddEvent("Solve");
   return summary;
