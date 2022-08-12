@@ -52,13 +52,12 @@
 
 #ifndef CERES_NO_CUDA
 #include "ceres/cuda_buffer.h"
-#include "ceres/cuda_linear_operator.h"
 #include "ceres/cuda_vector.h"
 #include "cusparse.h"
 
 namespace ceres::internal {
 
-class CERES_NO_EXPORT CudaSparseMatrix : public CudaLinearOperator {
+class CERES_NO_EXPORT CudaSparseMatrix {
  public:
   CudaSparseMatrix() {};
 
@@ -69,12 +68,12 @@ class CERES_NO_EXPORT CudaSparseMatrix : public CudaLinearOperator {
   bool Init(ContextImpl* context, std::string* message);
 
   // y = y + Ax;
-  void RightMultiply(const CudaVector& x, CudaVector* y) override;
+  void RightMultiply(const CudaVector& x, CudaVector* y);
   // y = y + A'x;
-  void LeftMultiply(const CudaVector& x, CudaVector* y) override;
+  void LeftMultiply(const CudaVector& x, CudaVector* y);
 
-  int num_rows() const override { return num_rows_; }
-  int num_cols() const override { return num_cols_; }
+  int num_rows() const { return num_rows_; }
+  int num_cols() const { return num_cols_; }
   int num_nonzeros() const { return num_nonzeros_; }
 
   void CopyFrom(const CRSMatrix& crs_matrix);

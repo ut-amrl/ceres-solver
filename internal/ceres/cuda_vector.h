@@ -59,16 +59,21 @@ namespace ceres::internal {
 // An Nx1 vector, denoted y hosted on the GPU, with CUDA-accelerated operations.
 class CERES_NO_EXPORT CudaVector {
  public:
-  CudaVector() = default;
-  ~CudaVector() = default;
 
+  // Create a pre-allocated vector of size N and return a pointer to it. If
+  // there are any errors during creation (e.g. Cuda error), nullptr is
+  // returned.
   static std::unique_ptr<CudaVector> Create(ContextImpl* context, int size);
+  CudaVector() = default;
 
-  CudaVector(ContextImpl* context, int size);
+  ~CudaVector() = default;
 
   bool Init(ContextImpl* context, std::string* message);
 
   void resize(int size);
+
+  // Perform a deep copy of the vector.
+  CudaVector& operator=(const CudaVector&);
 
   // Return the inner product x' * y.
   double dot(const CudaVector& x) const;
@@ -114,7 +119,7 @@ class CERES_NO_EXPORT CudaVector {
 
  private:
   CudaVector(const CudaVector&) = delete;
-  CudaVector& operator=(const CudaVector&) = delete;
+  CudaVector(ContextImpl* context, int size);
 
   int num_rows_ = 0;
   ContextImpl* context_ = nullptr;
@@ -123,22 +128,22 @@ class CERES_NO_EXPORT CudaVector {
   cusparseDnVecDescr_t cusparse_descr_ = nullptr;
 };
 
-// Convenience template initializer.
-template<typename T>
-bool InitCudaObjects(ContextImpl* context,
-                     std::string* error,
-                     T obj) {
-  return obj->Init(context, error);
+// Blas1 operations on Cuda vectors. These functions are needed as an
+// abstraction layer so that we can use different versions of a vector style
+// object in the conjugate gradients linear solver.
+inline double Norm(const CudaVector& x) { return x.norm(); }
+inline void SetZero(CudaVector& x) { x.setZero(); }
+inline void Axpby(
+    double a,
+    const CudaVector& x,
+    double b,
+    const CudaVector& y,
+    CudaVector& z) {
+  z = y;
+  z.Axpby(a, x, b);
 }
-
-template<typename T, typename... Targs>
-bool InitCudaObjects(ContextImpl* context,
-                     std::string* error,
-                     T obj1,
-                     Targs... objN) {
-  return (obj1->Init(context, error) &&
-          InitCudaObjects(context, error, objN...));
-}
+inline double Dot(const CudaVector& x, const CudaVector& y) { return x.dot(y); }
+inline void Copy(const CudaVector& from, CudaVector& to) { to = from; }
 
 }  // namespace ceres::internal
 

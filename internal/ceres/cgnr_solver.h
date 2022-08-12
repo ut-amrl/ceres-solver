@@ -37,7 +37,6 @@
 #include "ceres/linear_solver.h"
 
 #ifndef CERES_NO_CUDA
-#include "ceres/cuda_cgnr_linear_operator.h"
 #include "ceres/cuda_conjugate_gradients_solver.h"
 #include "ceres/cuda_linear_operator.h"
 #include "ceres/cuda_sparse_matrix.h"
@@ -77,7 +76,7 @@ class CERES_NO_EXPORT CgnrSolver final : public BlockSparseMatrixSolver {
 };
 
 #ifndef CERES_NO_CUDA
-// A Cuda-accelerated version of CgnrSolver. 
+// A Cuda-accelerated version of CgnrSolver.
 // This implementation leverages optimizations to cache the structure of A on
 // the first call to Solve(), and hence *must not be re-used* if the structure
 // of the problem (i.e. the sparsity structure of A) changes.
@@ -101,12 +100,12 @@ class CERES_NO_EXPORT CudaCgnrSolver final : public CompressedRowSparseMatrixSol
   ContextImpl* context_;
   LinearSolver::Options options_;
   std::unique_ptr<CudaConjugateGradientsSolver> solver_ = nullptr;
-  CudaCgnrLinearOperator lhs_;
   std::unique_ptr<CudaSparseMatrix> A_;
   std::unique_ptr<CudaVector> b_;
   std::unique_ptr<CudaVector> x_;
   std::unique_ptr<CudaVector> z_;
   std::unique_ptr<CudaVector> D_;
+  std::unique_ptr<CudaVector> scratch_[4];
 };
 #endif  // CERES_NO_CUDA
 

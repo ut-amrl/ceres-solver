@@ -62,6 +62,14 @@ CudaVector::CudaVector(ContextImpl* context, int size) :
   resize(size);
 }
 
+CudaVector& CudaVector::operator=(const CudaVector& other) {
+  if (this != &other) {
+    resize(other.num_rows());
+    data_.CopyFromGPUArray(other.data_.data(), num_rows_, context_->stream_);
+  }
+  return *this;
+}
+
 bool CudaVector::Init(ContextImpl* context, std::string* message) {
   CHECK(message != nullptr);
   if (context == nullptr) {

@@ -42,7 +42,6 @@
 #include "glog/logging.h"
 
 #ifndef CERES_NO_CUDA
-#include "ceres/cuda_cgnr_linear_operator.h"
 #include "ceres/cuda_conjugate_gradients_solver.h"
 #include "ceres/cuda_incomplete_cholesky_preconditioner.h"
 #include "ceres/cuda_linear_operator.h"
@@ -176,15 +175,76 @@ LinearSolver::Summary CgnrSolver::SolveImpl(
   }
   event_logger.AddEvent("Setup");
 
+  Vector* scratch_ptr[4] = {
+      &scratch_[0], &scratch_[1], &scratch_[2], &scratch_[3],
+  };
+
   LinearOperatorAdapter preconditioner(*preconditioner_);
   auto summary = ConjugateGradientsSolver(
-      cg_options, lhs, rhs, preconditioner, scratch_, cg_solution_);
+      cg_options, lhs, rhs, preconditioner, scratch_ptr, cg_solution_);
   VectorRef(x, A->num_cols()) = cg_solution_;
   event_logger.AddEvent("Solve");
   return summary;
 }
 
 #ifndef CERES_NO_CUDA
+
+// A linear operator which takes a matrix A and a diagonal vector D and
+// performs products of the form
+//
+//   (A^T A + D^T D)x
+//
+// This is used to implement iterative general sparse linear solving with
+// conjugate gradients, where A is the Jacobian and D is a regularizing
+// parameter. A brief proof is included in cgnr_linear_operator.h.
+class CERES_NO_EXPORT CudaCgnrLinearOperator final : public
+    ConjugateGradientsLinearOperator<CudaVector> {
+ public:
+
+  static std::unique_ptr<CudaCgnrLinearOperator> Create(
+      CudaSparseMatrix& A,
+      CudaVector* D,
+      CudaVector* z,
+      ContextImpl* context) {
+    if (context == nullptr || !context->InitCUDA(nullptr)) {
+      return nullptr;
+    }
+    return std::unique_ptr<CudaCgnrLinearOperator>(
+        new CudaCgnrLinearOperator(A, D, z));
+  }
+
+  CudaCgnrLinearOperator(CudaSparseMatrix& A,
+                         CudaVector* D,
+                         CudaVector* z) : A_(A), D_(D), z_(z) {}
+
+  void RightMultiply(const CudaVector& x, CudaVector& y) final {
+    // z = Ax
+    z_->setZero();
+    A_.RightMultiply(x, z_);
+
+    // y = y + Atz
+    //   = y + AtAx
+    A_.LeftMultiply(*z_, &y);
+
+    // y = y + DtDx
+    if (D_ != nullptr) {
+      y.DtDxpy(*D_, x);
+    }
+  }
+
+ private:
+  CudaSparseMatrix& A_;
+  CudaVector* D_ = nullptr;
+  CudaVector* z_ = nullptr;
+};
+
+class CERES_NO_EXPORT CudaIdentityPreconditioner final : public
+    ConjugateGradientsLinearOperator<CudaVector> {
+ public:
+  void RightMultiply(const CudaVector& x, CudaVector& y) final {
+    y.Axpby(1.0, x, 1.0);
+  }
+};
 
 CudaCgnrSolver::CudaCgnrSolver() = default;
 
@@ -248,6 +308,13 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
       summary.message = "Cuda Matrix or Vector initialization failed.";
       return summary;
     }
+    for (int i = 0; i < 4; ++i) {
+      scratch_[i] = CudaVector::Create(options_.context, A->num_cols());
+      if (scratch_[i] == nullptr) {
+        summary.message = "CudaVector::Create failed.";
+        return summary;
+      }
+    }
     event_logger.AddEvent("Initialize");
   } else {
     // Assume structure is cached, do a value copy.
@@ -259,15 +326,6 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
   D_->CopyFromCpu(per_solve_options.D, A->num_cols());
   event_logger.AddEvent("b CPU to GPU Transfer");
 
-  std::unique_ptr<CudaPreconditioner> preconditioner(nullptr);
-  if (options_.preconditioner_type == INCOMPLETE_CHOLESKY) {
-    preconditioner = std::make_unique<CudaIncompleteCholeskyPreconditioner>();
-    std::string message;
-    CHECK(preconditioner->Init(options_.context, &message));
-    CHECK(preconditioner->Update(*A_, *D_));
-  }
-
-  event_logger.AddEvent("Preconditioner Update");
   // Form z = Atb.
   z_->setZero();
   A_->LeftMultiply(*b_, z_.get());
@@ -278,16 +336,31 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
 
   // Solve (AtA + DtD)x = z (= Atb).
   x_->setZero();
-  if (!lhs_.Init(A_.get(), D_.get(), options_.context, &summary.message)) {
-    summary.termination_type = LinearSolverTerminationType::FATAL_ERROR;
+  auto lhs = CudaCgnrLinearOperator::Create(
+      *A_, D_.get(), z_.get(), options_.context);
+  if (lhs == nullptr) {
+    summary.message = "CudaCgnrLinearOperator::Create failed.";
     return summary;
   }
 
   event_logger.AddEvent("Setup");
   if (kDebug) printf("Solve (AtA + DtD)x = z (= Atb)\n");
 
-  summary = solver_->Solve(
-      &lhs_, preconditioner.get(), *z_, cg_per_solve_options, x_.get());
+  ConjugateGradientsSolverOptions cg_options;
+  cg_options.min_num_iterations = options_.min_num_iterations;
+  cg_options.max_num_iterations = options_.max_num_iterations;
+  cg_options.residual_reset_period = options_.residual_reset_period;
+  cg_options.q_tolerance = per_solve_options.q_tolerance;
+  cg_options.r_tolerance = per_solve_options.r_tolerance;
+
+  CudaVector* scratch_ptr[4] = {
+    scratch_[0].get(), scratch_[1].get(), scratch_[2].get(), scratch_[3].get()
+  };
+
+  CudaIdentityPreconditioner preconditioner;
+  summary = ConjugateGradientsSolver(
+      cg_options, *lhs, *z_, preconditioner, scratch_ptr, *x_);
+
   x_->CopyTo(x);
   event_logger.AddEvent("Solve");
   return summary;

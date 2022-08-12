@@ -29,6 +29,7 @@
 // Authors: joydeepb@cs.utexas.edu (Joydeep Biswas)
 
 #include <memory>
+#include <random>
 #include <string>
 
 #include "Eigen/Dense"
@@ -41,7 +42,6 @@
 #include "ceres/internal/config.h"
 #include "ceres/internal/eigen.h"
 #include "ceres/linear_solver.h"
-#include "ceres/random.h"
 #include "cuda_runtime.h"
 
 namespace ceres::internal {
@@ -70,6 +70,8 @@ std::unique_ptr<BlockSparseMatrix> GenerateSyntheticJacobian(
   // Total number of row blocks = k * n.
   bs->rows.resize(k * n);
   int values_offset = 0;
+  std::mt19937 prng;
+  std::uniform_real_distribution uniform_0_m(0.0, static_cast<double>(m));
   // Generate structure of the Jacobian.
   // For n cameras:
   for (int i = 0; i < n; ++i) {
@@ -77,7 +79,7 @@ std::unique_ptr<BlockSparseMatrix> GenerateSyntheticJacobian(
     // For k residuals per camera:
     for (int j = 0; j < k; ++j) {
       // Pick the landmark of the residual randomly from [0, m).
-      const int landmark_id = Uniform(m);
+      const int landmark_id = uniform_0_m(prng);
       const int landmark_block_id = n + landmark_id;
       const int row_idx = i * k + j;
       const int row = kResidualSize * row_idx;
