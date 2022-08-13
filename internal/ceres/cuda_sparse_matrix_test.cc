@@ -89,7 +89,6 @@ TEST_F(CudaSparseMatrixTest, RightMultiplyTest) {
   auto A_gpu = CudaSparseMatrix::Create(&context_, A_crs);
   auto x_gpu = CudaVector::Create(&context_, A_gpu->num_cols());
   auto res_gpu = CudaVector::Create(&context_, A_gpu->num_rows());
-  A_gpu->CopyFrom(*A_);
   x_gpu->CopyFromCpu(x_);
 
   const Vector minus_b = -b_;
@@ -100,11 +99,9 @@ TEST_F(CudaSparseMatrixTest, RightMultiplyTest) {
 
   Vector res;
   res_gpu->CopyTo(&res);
-  std::cout << "res' = " << res.transpose() << std::endl;
 
   Vector res_expected = minus_b;
   A_->RightMultiply(x_.data(), res_expected.data());
-  std::cout << "res_expected' = " << res_expected.transpose() << std::endl;
 
   EXPECT_LE((res - res_expected).norm(),
             std::numeric_limits<double>::epsilon() * 1e3);

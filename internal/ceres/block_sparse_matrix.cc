@@ -173,7 +173,7 @@ void BlockSparseMatrix::ToCompressedRowSparseMatrix(
     CompressedRowSparseMatrix* crs_matrix) const {
   TripletSparseMatrix ts_matrix;
   this->ToTripletSparseMatrix(&ts_matrix);
-  crs_matrix->FromTripletSparseMatrix(ts_matrix);
+  *crs_matrix = *CompressedRowSparseMatrix::FromTripletSparseMatrix(ts_matrix);
 }
 
 void BlockSparseMatrix::ToDenseMatrix(Matrix* dense_matrix) const {
