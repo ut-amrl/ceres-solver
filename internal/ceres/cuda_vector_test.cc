@@ -241,6 +241,61 @@ TEST(CUDAVector, Axpby) {
     z_gpu->CopyTo(&result);
     EXPECT_EQ(result, expected);
   }
+  {
+    Vector x(4);
+    Vector y(4);
+    x << 1, 1, 1, 1;
+    y << 100, 10, 1, 0;
+    ContextImpl context;
+    std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 10);
+    std::unique_ptr<CudaVector> y_gpu = CudaVector::Create(&context, 10);
+    EXPECT_NE(nullptr, x_gpu.get());
+    EXPECT_NE(nullptr, y_gpu.get());
+    x_gpu->CopyFromCpu(x);
+    y_gpu->CopyFromCpu(y);
+
+    Axpby(2.0, *x_gpu, 3.0, *y_gpu, *y_gpu);
+    Vector result;
+    Vector expected(4);
+    expected << 302, 32, 5, 2;
+    y_gpu->CopyTo(&result);
+    EXPECT_EQ(result, expected);
+  }
+  {
+    Vector x(4);
+    Vector y(4);
+    x << 1, 1, 1, 1;
+    y << 100, 10, 1, 0;
+    ContextImpl context;
+    std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 10);
+    std::unique_ptr<CudaVector> y_gpu = CudaVector::Create(&context, 10);
+    EXPECT_NE(nullptr, x_gpu.get());
+    EXPECT_NE(nullptr, y_gpu.get());
+    x_gpu->CopyFromCpu(x);
+    y_gpu->CopyFromCpu(y);
+
+    Axpby(2.0, *x_gpu, 3.0, *y_gpu, *x_gpu);
+    Vector result;
+    Vector expected(4);
+    expected << 302, 32, 5, 2;
+    x_gpu->CopyTo(&result);
+    EXPECT_EQ(result, expected);
+  }
+  {
+    Vector x(4);
+    x << 100, 10, 1, 0;
+    ContextImpl context;
+    std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 10);
+    EXPECT_NE(nullptr, x_gpu.get());
+    x_gpu->CopyFromCpu(x);
+
+    Axpby(2.0, *x_gpu, 3.0, *x_gpu, *x_gpu);
+    Vector result;
+    Vector expected(4);
+    expected << 500, 50, 5, 0;
+    x_gpu->CopyTo(&result);
+    EXPECT_EQ(result, expected);
+  }
 }
 
 TEST(CUDAVector, DtDxpy) {
@@ -263,6 +318,23 @@ TEST(CUDAVector, DtDxpy) {
   Vector expected(4);
   expected << 116, 28, 13, 4;
   y_gpu->CopyTo(&result);
+  EXPECT_EQ(result, expected);
+}
+
+TEST(CUDAVector, Scale) {
+  Vector x(4);
+  x << 1, 2, 3, 4;
+  ContextImpl context;
+  std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 4);
+  EXPECT_NE(nullptr, x_gpu.get());
+  x_gpu->CopyFromCpu(x);
+
+  x_gpu->Scale(-3.0);
+
+  Vector result;
+  Vector expected(4);
+  expected << -3.0, -6.0, -9.0, -12.0;
+  x_gpu->CopyTo(&result);
   EXPECT_EQ(result, expected);
 }
 

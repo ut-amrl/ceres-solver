@@ -106,6 +106,9 @@ class CERES_NO_EXPORT CudaVector {
   // y = diag(d)' * diag(d) * x + y.
   void DtDxpy(const CudaVector& D, const CudaVector& x);
 
+  // y = s * y.
+  void Scale(double s);
+
   int num_rows() const { return num_rows_; }
   int num_cols() const { return 1; }
 
@@ -137,14 +140,20 @@ inline void Axpby(
     double b,
     const CudaVector& y,
     CudaVector& z) {
-  CHECK_NE(&x, &y);
-  if (&x == &z) {
-    // x is also the output vector.
+  if (&x == &y && &y == &z) {
+    // z = (a + b) * z;
+    z.Scale(a + b);
+  } else if (&x == &z) {
+    // x is aliased to z.
+    // z = x
+    //   = b * y + a * x;
     z.Axpby(b, y, a);
   } else if (&y == &z) {
-    // y is also the output vector.
+    // y is aliased to z.
+    // z = y = a * x + b * y;
     z.Axpby(a, x, b);
   } else {
+    // General case: all inputs and outputs are distinct.
     z = y;
     z.Axpby(a, x, b);
   }

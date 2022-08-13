@@ -207,6 +207,15 @@ void CudaVector::DtDxpy(const CudaVector& D, const CudaVector& x) {
              context_->stream_);
 }
 
+void CudaVector::Scale(double s) {
+  CHECK_EQ(cublasDscal(context_->cublas_handle_,
+                       num_rows_,
+                       &s,
+                       data_.data(),
+                       1),
+           CUBLAS_STATUS_SUCCESS) << "CuBLAS cublasDscal failed.";
+}
+
 }  // namespace ceres::internal
 
 #endif  // CERES_NO_CUDA
