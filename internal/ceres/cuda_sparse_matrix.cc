@@ -397,11 +397,11 @@ void CudaSparseMatrix::SpMv(cusparseOperation_t op,
            CUSPARSE_STATUS_SUCCESS);
 }
 
-void CudaSparseMatrix::RightMultiply(const CudaVector& x, CudaVector* y) {
+void CudaSparseMatrix::RightMultiplyAndAccumulate(const CudaVector& x, CudaVector* y) {
   SpMv(CUSPARSE_OPERATION_NON_TRANSPOSE, x, y);
 }
 
-void CudaSparseMatrix::LeftMultiply(const CudaVector& x, CudaVector* y) {
+void CudaSparseMatrix::LeftMultiplyAndAccumulate(const CudaVector& x, CudaVector* y) {
   // TODO(Joydeep Biswas): If this operation is to be done frequently, we should
   // store a CSC format of the matrix, which is incidentally the CSR format of
   // the matrix transpose, and call cusparseSpMV with

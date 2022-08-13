@@ -95,13 +95,13 @@ TEST_F(CudaSparseMatrixTest, RightMultiplyTest) {
   // res = -b
   res_gpu->CopyFromCpu(minus_b);
   // res += A * x
-  A_gpu->RightMultiply(*x_gpu, res_gpu.get());
+  A_gpu->RightMultiplyAndAccumulate(*x_gpu, res_gpu.get());
 
   Vector res;
   res_gpu->CopyTo(&res);
 
   Vector res_expected = minus_b;
-  A_->RightMultiply(x_.data(), res_expected.data());
+  A_->RightMultiplyAndAccumulate(x_.data(), res_expected.data());
 
   EXPECT_LE((res - res_expected).norm(),
             std::numeric_limits<double>::epsilon() * 1e3);
@@ -136,7 +136,7 @@ TEST(CudaSparseMatrix, RightMultiplyTest) {
   b_gpu->CopyFromCpu(b);
   x_gpu->setZero();
 
-  A_gpu->RightMultiply(*b_gpu, x_gpu.get());
+  A_gpu->RightMultiplyAndAccumulate(*b_gpu, x_gpu.get());
 
   Vector x_computed;
   x_gpu->CopyTo(&x_computed);
@@ -173,7 +173,7 @@ TEST(CudaSparseMatrix, LeftMultiplyTest) {
   b_gpu->CopyFromCpu(b);
   x_gpu->setZero();
 
-  A_gpu->LeftMultiply(*b_gpu, x_gpu.get());
+  A_gpu->LeftMultiplyAndAccumulate(*b_gpu, x_gpu.get());
 
   Vector x_computed;
   x_gpu->CopyTo(&x_computed);
@@ -228,7 +228,7 @@ TEST(CudaSparseMatrix, LargeMultiplyTest) {
   // First check RightMultiply.
   {
     b_gpu->setZero();
-    A_gpu->RightMultiply(*x_gpu, b_gpu.get());
+    A_gpu->RightMultiplyAndAccumulate(*x_gpu, b_gpu.get());
     Vector b_computed;
     b_gpu->CopyTo(&b_computed);
     for (int i = 0; i < N; ++i) {
@@ -243,7 +243,7 @@ TEST(CudaSparseMatrix, LargeMultiplyTest) {
   // Next check LeftMultiply.
   {
     b_gpu->setZero();
-    A_gpu->LeftMultiply(*x_gpu, b_gpu.get());
+    A_gpu->LeftMultiplyAndAccumulate(*x_gpu, b_gpu.get());
     Vector b_computed;
     b_gpu->CopyTo(&b_computed);
     for (int i = 0; i < N; ++i) {

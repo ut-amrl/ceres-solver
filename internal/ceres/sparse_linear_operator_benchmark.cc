@@ -109,7 +109,7 @@ DEFINE_int32(num_parameters_per_landmark,
              "Number of parameters per landmark.");
 DEFINE_int32(num_residuals_per_camera, 100, "Number of residuals per camera.");
 
-static void BM_CpuRightMultiply(benchmark::State& state) {
+static void BM_CpuRightMultiplyAndAccumulate(benchmark::State& state) {
   // Perform setup here
   std::unique_ptr<BlockSparseMatrix> jacobian =
       GenerateSyntheticJacobian(FLAGS_num_cameras,
@@ -124,13 +124,13 @@ static void BM_CpuRightMultiply(benchmark::State& state) {
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed
-    jacobian->RightMultiply(x.data(), y.data());
+    jacobian->RightMultiplyAndAccumulate(x.data(), y.data());
     sum += y.norm();
   }
   CHECK_NE(sum, 0.0);
 }
 
-static void BM_CpuLeftMultiply(benchmark::State& state) {
+static void BM_CpuLeftMultiplyAndAccumulate(benchmark::State& state) {
   // Perform setup here
   std::unique_ptr<BlockSparseMatrix> jacobian =
       GenerateSyntheticJacobian(FLAGS_num_cameras,
@@ -145,13 +145,13 @@ static void BM_CpuLeftMultiply(benchmark::State& state) {
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed
-    jacobian->LeftMultiply(x.data(), y.data());
+    jacobian->LeftMultiplyAndAccumulate(x.data(), y.data());
     sum += y.norm();
   }
   CHECK_NE(sum, 0.0);
 }
 
-static void BM_CudaRightMultiply(benchmark::State& state) {
+static void BM_CudaRightMultiplyAndAccumulate(benchmark::State& state) {
   // Perform setup here
   std::unique_ptr<BlockSparseMatrix> jacobian =
       GenerateSyntheticJacobian(FLAGS_num_cameras,
@@ -180,14 +180,14 @@ static void BM_CudaRightMultiply(benchmark::State& state) {
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed
-    cuda_jacobian.RightMultiply(*cuda_x, cuda_y.get());
+    cuda_jacobian.RightMultiplyAndAccumulate(*cuda_x, cuda_y.get());
     sum += cuda_y->norm();
     CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
   }
   CHECK_NE(sum, 0.0);
 }
 
-static void BM_CudaLeftMultiply(benchmark::State& state) {
+static void BM_CudaLeftMultiplyAndAccumulate(benchmark::State& state) {
   // Perform setup here
   std::unique_ptr<BlockSparseMatrix> jacobian =
       GenerateSyntheticJacobian(FLAGS_num_cameras,
@@ -216,17 +216,17 @@ static void BM_CudaLeftMultiply(benchmark::State& state) {
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed
-    cuda_jacobian.LeftMultiply(*cuda_x, cuda_y.get());
+    cuda_jacobian.LeftMultiplyAndAccumulate(*cuda_x, cuda_y.get());
     sum += cuda_y->norm();
     CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
   }
   CHECK_NE(sum, 0.0);
 }
 
-BENCHMARK(BM_CpuRightMultiply);
-BENCHMARK(BM_CpuLeftMultiply);
-BENCHMARK(BM_CudaRightMultiply);
-BENCHMARK(BM_CudaLeftMultiply);
+BENCHMARK(BM_CpuRightMultiplyAndAccumulate);
+BENCHMARK(BM_CpuLeftMultiplyAndAccumulate);
+BENCHMARK(BM_CudaRightMultiplyAndAccumulate);
+BENCHMARK(BM_CudaLeftMultiplyAndAccumulate);
 
 BENCHMARK_MAIN();
 

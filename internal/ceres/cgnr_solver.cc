@@ -201,14 +201,14 @@ class CERES_NO_EXPORT CudaCgnrLinearOperator final : public
                          CudaVector* D,
                          CudaVector* z) : A_(A), D_(D), z_(z) {}
 
-  void RightMultiply(const CudaVector& x, CudaVector& y) final {
+  void RightMultiplyAndAccumulate(const CudaVector& x, CudaVector& y) final {
     // z = Ax
     z_->setZero();
-    A_.RightMultiply(x, z_);
+    A_.RightMultiplyAndAccumulate(x, z_);
 
     // y = y + Atz
     //   = y + AtAx
-    A_.LeftMultiply(*z_, &y);
+    A_.LeftMultiplyAndAccumulate(*z_, &y);
 
     // y = y + DtDx
     if (D_ != nullptr) {
@@ -225,9 +225,8 @@ class CERES_NO_EXPORT CudaCgnrLinearOperator final : public
 class CERES_NO_EXPORT CudaIdentityPreconditioner final : public
     ConjugateGradientsLinearOperator<CudaVector> {
  public:
-  void RightMultiply(const CudaVector& x, CudaVector& y) final {
-    // y.Axpby(1.0, x, 1.0);
-    y = x;
+  void RightMultiplyAndAccumulate(const CudaVector& x, CudaVector& y) final {
+    y.Axpby(1.0, x, 1.0);
   }
 };
 
@@ -305,7 +304,7 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
 
   // Form z = Atb.
   Atb_->setZero();
-  A_->LeftMultiply(*b_, Atb_.get());
+  A_->LeftMultiplyAndAccumulate(*b_, Atb_.get());
   if (kDebug) printf("z = Atb\n");
 
   LinearSolver::PerSolveOptions cg_per_solve_options = per_solve_options;

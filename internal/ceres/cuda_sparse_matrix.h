@@ -68,9 +68,9 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   bool Init(ContextImpl* context, std::string* message);
 
   // y = y + Ax;
-  void RightMultiply(const CudaVector& x, CudaVector* y);
+  void RightMultiplyAndAccumulate(const CudaVector& x, CudaVector* y);
   // y = y + A'x;
-  void LeftMultiply(const CudaVector& x, CudaVector* y);
+  void LeftMultiplyAndAccumulate(const CudaVector& x, CudaVector* y);
 
   int num_rows() const { return num_rows_; }
   int num_cols() const { return num_cols_; }
