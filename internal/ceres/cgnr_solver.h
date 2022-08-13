@@ -37,8 +37,6 @@
 #include "ceres/linear_solver.h"
 
 #ifndef CERES_NO_CUDA
-#include "ceres/cuda_conjugate_gradients_solver.h"
-#include "ceres/cuda_linear_operator.h"
 #include "ceres/cuda_sparse_matrix.h"
 #include "ceres/cuda_vector.h"
 #endif  // CERES_NO_CUDA

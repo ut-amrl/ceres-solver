@@ -166,8 +166,10 @@ void CudaSparseMatrix::Resize(int num_rows, int num_cols, int num_nnz) {
 }
 
 void CudaSparseMatrix::CopyFrom(const BlockSparseMatrix& bs_matrix) {
-  CRSMatrix crs_matrix;
-  bs_matrix.ToCRSMatrix(&crs_matrix);
+  CompressedRowSparseMatrix crs_matrix(bs_matrix.num_rows(),
+                                       bs_matrix.num_cols(),
+                                       bs_matrix.num_nonzeros());
+  bs_matrix.ToCompressedRowSparseMatrix(&crs_matrix);
   CopyFrom(crs_matrix);
 }
 

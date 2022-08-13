@@ -64,11 +64,8 @@ class CERES_NO_EXPORT CudaVector {
   // there are any errors during creation (e.g. Cuda error), nullptr is
   // returned.
   static std::unique_ptr<CudaVector> Create(ContextImpl* context, int size);
-  CudaVector() = default;
 
   ~CudaVector() = default;
-
-  bool Init(ContextImpl* context, std::string* message);
 
   void resize(int size);
 
@@ -120,6 +117,7 @@ class CERES_NO_EXPORT CudaVector {
  private:
   CudaVector(const CudaVector&) = delete;
   CudaVector(ContextImpl* context, int size);
+  bool Init(ContextImpl* context, std::string* message);
 
   int num_rows_ = 0;
   ContextImpl* context_ = nullptr;

@@ -42,9 +42,6 @@
 #include "glog/logging.h"
 
 #ifndef CERES_NO_CUDA
-#include "ceres/cuda_conjugate_gradients_solver.h"
-#include "ceres/cuda_incomplete_cholesky_preconditioner.h"
-#include "ceres/cuda_linear_operator.h"
 #include "ceres/cuda_sparse_matrix.h"
 #include "ceres/cuda_vector.h"
 #endif  // CERES_NO_CUDA
@@ -335,7 +332,6 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
   CudaIdentityPreconditioner preconditioner;
   summary = ConjugateGradientsSolver(
       cg_options, lhs, *Atb_, preconditioner, scratch_ptr, *x_);
-  // printf("summary: %s\n", summary.message.c_str());
   x_->CopyTo(x);
   event_logger.AddEvent("Solve");
   return summary;

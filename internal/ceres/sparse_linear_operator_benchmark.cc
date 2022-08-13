@@ -28,6 +28,7 @@
 //
 // Authors: joydeepb@cs.utexas.edu (Joydeep Biswas)
 
+#include <iostream>
 #include <memory>
 #include <random>
 #include <string>
@@ -162,11 +163,11 @@ static void BM_CudaRightMultiply(benchmark::State& state) {
   std::string message;
   context.InitCUDA(&message);
   CudaSparseMatrix cuda_jacobian;
-  CudaVector cuda_x;
-  CudaVector cuda_y;
   cuda_jacobian.Init(&context, &message);
-  cuda_x.Init(&context, &message);
-  cuda_y.Init(&context, &message);
+  std::unique_ptr<CudaVector> cuda_x = CudaVector::Create(&context, 0);
+  std::unique_ptr<CudaVector> cuda_y = CudaVector::Create(&context, 0);
+  CHECK_NE(cuda_x.get(), nullptr);
+  CHECK_NE(cuda_y.get(), nullptr);
 
   Vector x(jacobian->num_cols());
   Vector y(jacobian->num_rows());
@@ -174,13 +175,13 @@ static void BM_CudaRightMultiply(benchmark::State& state) {
   y.setRandom();
 
   cuda_jacobian.CopyFrom(*jacobian);
-  cuda_x.CopyFromCpu(x);
-  cuda_y.CopyFromCpu(y);
+  cuda_x->CopyFromCpu(x);
+  cuda_y->CopyFromCpu(y);
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed
-    cuda_jacobian.RightMultiply(cuda_x, &cuda_y);
-    sum += cuda_y.norm();
+    cuda_jacobian.RightMultiply(*cuda_x, cuda_y.get());
+    sum += cuda_y->norm();
     CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
   }
   CHECK_NE(sum, 0.0);
@@ -198,11 +199,11 @@ static void BM_CudaLeftMultiply(benchmark::State& state) {
   std::string message;
   context.InitCUDA(&message);
   CudaSparseMatrix cuda_jacobian;
-  CudaVector cuda_x;
-  CudaVector cuda_y;
   cuda_jacobian.Init(&context, &message);
-  cuda_x.Init(&context, &message);
-  cuda_y.Init(&context, &message);
+  std::unique_ptr<CudaVector> cuda_x = CudaVector::Create(&context, 0);
+  std::unique_ptr<CudaVector> cuda_y = CudaVector::Create(&context, 0);
+  CHECK_NE(cuda_x.get(), nullptr);
+  CHECK_NE(cuda_y.get(), nullptr);
 
   Vector x(jacobian->num_rows());
   Vector y(jacobian->num_cols());
@@ -210,13 +211,13 @@ static void BM_CudaLeftMultiply(benchmark::State& state) {
   y.setRandom();
 
   cuda_jacobian.CopyFrom(*jacobian);
-  cuda_x.CopyFromCpu(x);
-  cuda_y.CopyFromCpu(y);
+  cuda_x->CopyFromCpu(x);
+  cuda_y->CopyFromCpu(y);
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed
-    cuda_jacobian.LeftMultiply(cuda_x, &cuda_y);
-    sum += cuda_y.norm();
+    cuda_jacobian.LeftMultiply(*cuda_x, cuda_y.get());
+    sum += cuda_y->norm();
     CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
   }
   CHECK_NE(sum, 0.0);

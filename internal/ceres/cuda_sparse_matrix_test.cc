@@ -82,27 +82,29 @@ class CudaSparseMatrixTest : public ::testing::Test {
 };
 
 TEST_F(CudaSparseMatrixTest, RightMultiplyTest) {
-  CudaSparseMatrix A_gpu;
-  CudaVector x_gpu;
-  CudaVector res_gpu;
   std::string message;
-  EXPECT_TRUE(A_gpu.Init(&context_, &message));
-  EXPECT_TRUE(x_gpu.Init(&context_, &message));
-  EXPECT_TRUE(res_gpu.Init(&context_, &message));
-  A_gpu.CopyFrom(*A_);
-  x_gpu.CopyFromCpu(x_);
+  CompressedRowSparseMatrix A_crs(
+      A_->num_rows(), A_->num_cols(), A_->num_nonzeros());
+  A_->ToCompressedRowSparseMatrix(&A_crs);
+  auto A_gpu = CudaSparseMatrix::Create(&context_, A_crs);
+  auto x_gpu = CudaVector::Create(&context_, A_gpu->num_cols());
+  auto res_gpu = CudaVector::Create(&context_, A_gpu->num_rows());
+  A_gpu->CopyFrom(*A_);
+  x_gpu->CopyFromCpu(x_);
 
-  Vector minus_b = -b_;
+  const Vector minus_b = -b_;
   // res = -b
-  res_gpu.CopyFromCpu(minus_b);
+  res_gpu->CopyFromCpu(minus_b);
   // res += A * x
-  A_gpu.RightMultiply(x_gpu, &res_gpu);
+  A_gpu->RightMultiply(*x_gpu, res_gpu.get());
 
   Vector res;
-  res_gpu.CopyTo(&res);
+  res_gpu->CopyTo(&res);
+  std::cout << "res' = " << res.transpose() << std::endl;
 
   Vector res_expected = minus_b;
   A_->RightMultiply(x_.data(), res_expected.data());
+  std::cout << "res_expected' = " << res_expected.transpose() << std::endl;
 
   EXPECT_LE((res - res_expected).norm(),
             std::numeric_limits<double>::epsilon() * 1e3);
@@ -126,23 +128,21 @@ TEST(CudaSparseMatrix, RightMultiplyTest) {
   Vector x_expected(2);
   x_expected << 5, 18;
 
-  CudaSparseMatrix A_gpu;
-  CudaVector b_gpu;
-  CudaVector x_gpu;
-  std::string message;
   ContextImpl context;
-  EXPECT_TRUE(A_gpu.Init(&context, &message));
-  EXPECT_TRUE(b_gpu.Init(&context, &message));
-  EXPECT_TRUE(x_gpu.Init(&context, &message));
-  A_gpu.CopyFrom(A);
-  b_gpu.CopyFromCpu(b);
-  x_gpu.resize(2);
-  x_gpu.setZero();
+  auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A);
+  auto A_gpu = CudaSparseMatrix::Create(&context, *A_crs);
+  auto b_gpu = CudaVector::Create(&context, A.num_cols());
+  auto x_gpu = CudaVector::Create(&context, A.num_rows());
+  EXPECT_NE(A_gpu, nullptr);
+  EXPECT_NE(b_gpu, nullptr);
+  EXPECT_NE(x_gpu, nullptr);
+  b_gpu->CopyFromCpu(b);
+  x_gpu->setZero();
 
-  A_gpu.RightMultiply(b_gpu, &x_gpu);
+  A_gpu->RightMultiply(*b_gpu, x_gpu.get());
 
   Vector x_computed;
-  x_gpu.CopyTo(&x_computed);
+  x_gpu->CopyTo(&x_computed);
 
   EXPECT_EQ(x_computed, x_expected);
 }
@@ -165,23 +165,21 @@ TEST(CudaSparseMatrix, LeftMultiplyTest) {
   Vector x_expected(4);
   x_expected << 1, 8, 8, 0;
 
-  CudaSparseMatrix A_gpu;
-  CudaVector b_gpu;
-  CudaVector x_gpu;
-  std::string message;
   ContextImpl context;
-  EXPECT_TRUE(A_gpu.Init(&context, &message));
-  EXPECT_TRUE(b_gpu.Init(&context, &message));
-  EXPECT_TRUE(x_gpu.Init(&context, &message));
-  A_gpu.CopyFrom(A);
-  b_gpu.CopyFromCpu(b);
-  x_gpu.resize(4);
-  x_gpu.setZero();
+  auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A);
+  auto A_gpu = CudaSparseMatrix::Create(&context, *A_crs);
+  auto b_gpu = CudaVector::Create(&context, A.num_rows());
+  auto x_gpu = CudaVector::Create(&context, A.num_cols());
+  EXPECT_NE(A_gpu, nullptr);
+  EXPECT_NE(b_gpu, nullptr);
+  EXPECT_NE(x_gpu, nullptr);
+  b_gpu->CopyFromCpu(b);
+  x_gpu->setZero();
 
-  A_gpu.LeftMultiply(b_gpu, &x_gpu);
+  A_gpu->LeftMultiply(*b_gpu, x_gpu.get());
 
   Vector x_computed;
-  x_gpu.CopyTo(&x_computed);
+  x_gpu->CopyTo(&x_computed);
 
   EXPECT_EQ(x_computed, x_expected);
 }
@@ -219,24 +217,23 @@ TEST(CudaSparseMatrix, LargeMultiplyTest) {
     x[i] = i + 1;
   }
 
-  CudaSparseMatrix A_gpu;
-  CudaVector b_gpu;
-  CudaVector x_gpu;
-  std::string message;
   ContextImpl context;
-  EXPECT_TRUE(A_gpu.Init(&context, &message));
-  EXPECT_TRUE(b_gpu.Init(&context, &message));
-  EXPECT_TRUE(x_gpu.Init(&context, &message));
-  A_gpu.CopyFrom(A);
-  b_gpu.resize(N);
-  x_gpu.CopyFromCpu(x);
+  auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A);
+  auto A_gpu = CudaSparseMatrix::Create(&context, *A_crs);
+  auto b_gpu = CudaVector::Create(&context, N);
+  auto x_gpu = CudaVector::Create(&context, N);
+  EXPECT_NE(A_gpu, nullptr);
+  EXPECT_NE(b_gpu, nullptr);
+  EXPECT_NE(x_gpu, nullptr);
+  x_gpu->CopyFromCpu(x);
+
 
   // First check RightMultiply.
   {
-    b_gpu.setZero();
-    A_gpu.RightMultiply(x_gpu, &b_gpu);
+    b_gpu->setZero();
+    A_gpu->RightMultiply(*x_gpu, b_gpu.get());
     Vector b_computed;
-    b_gpu.CopyTo(&b_computed);
+    b_gpu->CopyTo(&b_computed);
     for (int i = 0; i < N; ++i) {
       if (i + 1 < N) {
         EXPECT_EQ(b_computed[i], 2 * (i + 1) + 1);
@@ -248,10 +245,10 @@ TEST(CudaSparseMatrix, LargeMultiplyTest) {
 
   // Next check LeftMultiply.
   {
-    b_gpu.setZero();
-    A_gpu.LeftMultiply(x_gpu, &b_gpu);
+    b_gpu->setZero();
+    A_gpu->LeftMultiply(*x_gpu, b_gpu.get());
     Vector b_computed;
-    b_gpu.CopyTo(&b_computed);
+    b_gpu->CopyTo(&b_computed);
     for (int i = 0; i < N; ++i) {
       if (i > 0) {
         EXPECT_EQ(b_computed[i], 2 * (i + 1) - 1);

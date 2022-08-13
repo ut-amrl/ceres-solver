@@ -42,39 +42,29 @@ namespace internal {
 #ifndef CERES_NO_CUDA
 
 TEST(CUDAVector, InvalidOptionOnCreate) {
-  CudaVector x;
-  ContextImpl* context = nullptr;
-  std::string message;
-  EXPECT_FALSE(x.Init(context, &message));
+  std::unique_ptr<CudaVector> x = CudaVector::Create(nullptr, 10);
+  EXPECT_EQ(nullptr, x.get());
 }
 
 TEST(CUDAVector, ValidOptionOnCreate) {
-  CudaVector x;
   ContextImpl context;
+  std::unique_ptr<CudaVector> x = CudaVector::Create(&context, 10);
   std::string message;
-  EXPECT_TRUE(x.Init(&context, &message));
+  EXPECT_NE(nullptr, x.get());
 }
 
 TEST(CUDAVector, CopyVector) {
   Vector x(3);
   x << 1, 2, 3;
-  CudaVector y;
   ContextImpl context;
-  std::string message;
-  EXPECT_TRUE(y.Init(&context, &message));
-  y.CopyFromCpu(x);
-  EXPECT_EQ(y.num_rows(), 3);
+  std::unique_ptr<CudaVector> y = CudaVector::Create(&context, 10);
+  EXPECT_NE(nullptr, y.get());
+  y->CopyFromCpu(x);
+  EXPECT_EQ(y->num_rows(), 3);
 
   Vector z(3);
   z << 0, 0, 0;
-  y.CopyTo(&z);
-  EXPECT_EQ(x, z);
-
-  CudaVector y_copy;
-  y_copy.Init(&context, &message);
-  y_copy.CopyFromCpu(y);
-  EXPECT_EQ(y_copy.num_rows(), 3);
-  y_copy.CopyTo(&z);
+  y->CopyTo(&z);
   EXPECT_EQ(x, z);
 }
 
@@ -96,53 +86,36 @@ TEST(CUDAVector, DeepCopy) {
   EXPECT_EQ(x, y);
 }
 
-TEST(CUDAVector, CopyMemory) {
-  Vector x(3);
-  x << 1, 2, 3;
-  CudaVector y;
-  ContextImpl context;
-  std::string message;
-  EXPECT_TRUE(y.Init(&context, &message));
-  y.CopyFromCpu(x.data(), x.rows());
-  EXPECT_EQ(y.num_rows(), 3);
-
-  Vector z(3);
-  z << 0, 0, 0;
-  y.CopyTo(z.data());
-  EXPECT_EQ(x, z);
-}
-
 TEST(CUDAVector, Dot) {
   Vector x(3);
   Vector y(3);
   x << 1, 2, 3;
   y << 100, 10, 1;
-  CudaVector x_gpu;
-  CudaVector y_gpu;
   ContextImpl context;
-  std::string message;
-  EXPECT_TRUE(x_gpu.Init(&context, &message));
-  EXPECT_TRUE(y_gpu.Init(&context, &message));
-  x_gpu.CopyFromCpu(x);
-  y_gpu.CopyFromCpu(y);
+  std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 10);
+  std::unique_ptr<CudaVector> y_gpu = CudaVector::Create(&context, 10);
+  EXPECT_NE(nullptr, x_gpu.get());
+  EXPECT_NE(nullptr, y_gpu.get());
+  x_gpu->CopyFromCpu(x);
+  y_gpu->CopyFromCpu(y);
 
-  EXPECT_EQ(x_gpu.dot(y_gpu), 123.0);
+  EXPECT_EQ(x_gpu->dot(*y_gpu), 123.0);
+  EXPECT_EQ(Dot(*x_gpu, *y_gpu), 123.0);
 }
 
 TEST(CUDAVector, Norm) {
   Vector x(3);
   x << 1, 2, 3;
-  CudaVector x_gpu;
   ContextImpl context;
-  std::string message;
-  EXPECT_TRUE(x_gpu.Init(&context, &message));
-  x_gpu.CopyFromCpu(x);
+  std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 10);
+  EXPECT_NE(nullptr, x_gpu.get());
+  x_gpu->CopyFromCpu(x);
 
-  EXPECT_NEAR(x_gpu.norm(),
+  EXPECT_NEAR(x_gpu->norm(),
               sqrt(1.0 + 4.0 + 9.0),
               std::numeric_limits<double>::epsilon());
 
-  EXPECT_NEAR(Norm(x_gpu),
+  EXPECT_NEAR(Norm(*x_gpu),
               sqrt(1.0 + 4.0 + 9.0),
               std::numeric_limits<double>::epsilon());
 }
@@ -150,39 +123,36 @@ TEST(CUDAVector, Norm) {
 TEST(CUDAVector, SetZero) {
   Vector x(4);
   x << 1, 1, 1, 1;
-  CudaVector x_gpu;
   ContextImpl context;
-  std::string message;
-  EXPECT_TRUE(x_gpu.Init(&context, &message));
-  x_gpu.CopyFromCpu(x);
+  std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 10);
+  EXPECT_NE(nullptr, x_gpu.get());
+  x_gpu->CopyFromCpu(x.data(), x.size());
 
-  EXPECT_NEAR(x_gpu.norm(),
+  EXPECT_NEAR(x_gpu->norm(),
               2.0,
               std::numeric_limits<double>::epsilon());
 
-  x_gpu.setZero();
-  EXPECT_NEAR(x_gpu.norm(),
+  x_gpu->setZero();
+  EXPECT_NEAR(x_gpu->norm(),
               0.0,
               std::numeric_limits<double>::epsilon());
 
-  x_gpu.CopyFromCpu(x);
-  EXPECT_NEAR(x_gpu.norm(),
+  x_gpu->CopyFromCpu(x);
+  EXPECT_NEAR(x_gpu->norm(),
               2.0,
               std::numeric_limits<double>::epsilon());
-  SetZero(x_gpu);
-  EXPECT_NEAR(x_gpu.norm(),
+  SetZero(*x_gpu);
+  EXPECT_NEAR(x_gpu->norm(),
               0.0,
               std::numeric_limits<double>::epsilon());
 }
 
 TEST(CUDAVector, Resize) {
-  CudaVector x_gpu;
   ContextImpl context;
-  std::string message;
-  EXPECT_TRUE(x_gpu.Init(&context, &message));
-  EXPECT_EQ(x_gpu.num_rows(), 0);
-  x_gpu.resize(4);
-  EXPECT_EQ(x_gpu.num_rows(), 4);
+  std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 10);
+  EXPECT_EQ(x_gpu->num_rows(), 10);
+  x_gpu->resize(4);
+  EXPECT_EQ(x_gpu->num_rows(), 4);
 }
 
 TEST(CUDAVector, Axpy) {
@@ -190,20 +160,19 @@ TEST(CUDAVector, Axpy) {
   Vector y(4);
   x << 1, 1, 1, 1;
   y << 100, 10, 1, 0;
-  CudaVector x_gpu;
-  CudaVector y_gpu;
   ContextImpl context;
-  std::string message;
-  EXPECT_TRUE(x_gpu.Init(&context, &message));
-  EXPECT_TRUE(y_gpu.Init(&context, &message));
-  x_gpu.CopyFromCpu(x);
-  y_gpu.CopyFromCpu(y);
+  std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 4);
+  std::unique_ptr<CudaVector> y_gpu = CudaVector::Create(&context, 4);
+  EXPECT_NE(nullptr, x_gpu.get());
+  EXPECT_NE(nullptr, y_gpu.get());
+  x_gpu->CopyFromCpu(x);
+  y_gpu->CopyFromCpu(y);
 
-  x_gpu.Axpy(2.0, y_gpu);
+  x_gpu->Axpy(2.0, *y_gpu);
   Vector result;
   Vector expected(4);
   expected << 201, 21, 3, 1;
-  x_gpu.CopyTo(&result);
+  x_gpu->CopyTo(&result);
   EXPECT_EQ(result, expected);
 }
 
@@ -213,20 +182,19 @@ TEST(CUDAVector, Axpby) {
     Vector y(4);
     x << 1, 1, 1, 1;
     y << 100, 10, 1, 0;
-    CudaVector x_gpu;
-    CudaVector y_gpu;
     ContextImpl context;
-    std::string message;
-    EXPECT_TRUE(x_gpu.Init(&context, &message));
-    EXPECT_TRUE(y_gpu.Init(&context, &message));
-    x_gpu.CopyFromCpu(x);
-    y_gpu.CopyFromCpu(y);
+    std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 4);
+    std::unique_ptr<CudaVector> y_gpu = CudaVector::Create(&context, 4);
+    EXPECT_NE(nullptr, x_gpu.get());
+    EXPECT_NE(nullptr, y_gpu.get());
+    x_gpu->CopyFromCpu(x);
+    y_gpu->CopyFromCpu(y);
 
-    x_gpu.Axpby(2.0, y_gpu, 3.0);
+    x_gpu->Axpby(2.0, *y_gpu, 3.0);
     Vector result;
     Vector expected(4);
     expected << 203, 23, 5, 3;
-    x_gpu.CopyTo(&result);
+    x_gpu->CopyTo(&result);
     EXPECT_EQ(result, expected);
   }
   {
@@ -234,20 +202,19 @@ TEST(CUDAVector, Axpby) {
     Vector y(4);
     x << 1, 1, 1, 1;
     y << 100, 10, 1, 0;
-    CudaVector x_gpu;
-    CudaVector y_gpu;
     ContextImpl context;
-    std::string message;
-    EXPECT_TRUE(x_gpu.Init(&context, &message));
-    EXPECT_TRUE(y_gpu.Init(&context, &message));
-    x_gpu.CopyFromCpu(x);
-    y_gpu.CopyFromCpu(y);
+    std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 4);
+    std::unique_ptr<CudaVector> y_gpu = CudaVector::Create(&context, 4);
+    EXPECT_NE(nullptr, x_gpu.get());
+    EXPECT_NE(nullptr, y_gpu.get());
+    x_gpu->CopyFromCpu(x);
+    y_gpu->CopyFromCpu(y);
 
-    Axpby(2.0, y_gpu, 3.0, x_gpu, x_gpu);
+    Axpby(2.0, *y_gpu, 3.0, *x_gpu, *x_gpu);
     Vector result;
     Vector expected(4);
     expected << 203, 23, 5, 3;
-    x_gpu.CopyTo(&result);
+    x_gpu->CopyTo(&result);
     EXPECT_EQ(result, expected);
   }
   {
@@ -255,24 +222,23 @@ TEST(CUDAVector, Axpby) {
     Vector y(4);
     x << 1, 1, 1, 1;
     y << 100, 10, 1, 0;
-    CudaVector x_gpu;
-    CudaVector y_gpu;
-    CudaVector z_gpu;
     ContextImpl context;
-    std::string message;
-    EXPECT_TRUE(x_gpu.Init(&context, &message));
-    EXPECT_TRUE(y_gpu.Init(&context, &message));
-    EXPECT_TRUE(z_gpu.Init(&context, &message));
-    x_gpu.CopyFromCpu(x);
-    y_gpu.CopyFromCpu(y);
-    z_gpu.resize(4);
-    z_gpu.setZero();
+    std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 10);
+    std::unique_ptr<CudaVector> y_gpu = CudaVector::Create(&context, 10);
+    std::unique_ptr<CudaVector> z_gpu = CudaVector::Create(&context, 10);
+    EXPECT_NE(nullptr, x_gpu.get());
+    EXPECT_NE(nullptr, y_gpu.get());
+    EXPECT_NE(nullptr, z_gpu.get());
+    x_gpu->CopyFromCpu(x);
+    y_gpu->CopyFromCpu(y);
+    z_gpu->resize(4);
+    z_gpu->setZero();
 
-    Axpby(2.0, y_gpu, 3.0, x_gpu, z_gpu);
+    Axpby(2.0, *y_gpu, 3.0, *x_gpu, *z_gpu);
     Vector result;
     Vector expected(4);
     expected << 203, 23, 5, 3;
-    z_gpu.CopyTo(&result);
+    z_gpu->CopyTo(&result);
     EXPECT_EQ(result, expected);
   }
 }
@@ -284,23 +250,19 @@ TEST(CUDAVector, DtDxpy) {
   x << 1, 2, 3, 4;
   y << 100, 10, 1, 0;
   D << 4, 3, 2, 1;
-  CudaVector x_gpu;
-  CudaVector y_gpu;
-  CudaVector D_gpu;
   ContextImpl context;
-  std::string message;
-  EXPECT_TRUE(x_gpu.Init(&context, &message));
-  EXPECT_TRUE(y_gpu.Init(&context, &message));
-  EXPECT_TRUE(D_gpu.Init(&context, &message));
-  x_gpu.CopyFromCpu(x);
-  y_gpu.CopyFromCpu(y);
-  D_gpu.CopyFromCpu(D);
+  std::unique_ptr<CudaVector> x_gpu = CudaVector::Create(&context, 4);
+  std::unique_ptr<CudaVector> y_gpu = CudaVector::Create(&context, 4);
+  std::unique_ptr<CudaVector> D_gpu = CudaVector::Create(&context, 4);
+  x_gpu->CopyFromCpu(x);
+  y_gpu->CopyFromCpu(y);
+  D_gpu->CopyFromCpu(D);
 
-  y_gpu.DtDxpy(D_gpu, x_gpu);
+  y_gpu->DtDxpy(*D_gpu, *x_gpu);
   Vector result;
   Vector expected(4);
   expected << 116, 28, 13, 4;
-  y_gpu.CopyTo(&result);
+  y_gpu->CopyTo(&result);
   EXPECT_EQ(result, expected);
 }
 
