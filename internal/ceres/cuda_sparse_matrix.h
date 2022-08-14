@@ -79,20 +79,10 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   int num_cols() const { return num_cols_; }
   int num_nonzeros() const { return num_nonzeros_; }
 
-  void CopyFrom(const BlockSparseMatrix& bs_matrix);
   void CopyFrom(const CompressedRowSparseMatrix& crs_matrix);
-  void CopyValues(const CompressedRowSparseMatrix& crs_matrix);
-  void CopyTo(CompressedRowSparseMatrix* crs_matrix);
-
-  // Set this matrix as the transpose of the other given matrix.
-  void CopyFromTranspose(const CudaSparseMatrix& other);
+  void CopyValuesFromCpu(const CompressedRowSparseMatrix& crs_matrix);
 
   const cusparseSpMatDescr_t& descr() const { return descr_; }
-
-  void Resize(int num_rows, int num_cols, int num_nnz);
-
-  // M = A * B.
-  void Multiply(const CudaSparseMatrix& A, const CudaSparseMatrix& B);
 
  private:
   CudaSparseMatrix() = delete;

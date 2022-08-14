@@ -103,66 +103,58 @@ TEST_F(CudaSparseMatrixTest, RightMultiplyAndAccumulate) {
             std::numeric_limits<double>::epsilon() * 1e3);
 }
 
-TEST(CudaSparseMatrix, Multiply) {
-  // A:
+TEST(CudaSparseMatrix, CopyValuesFromCpu) {
+  // A1:
+  // [ 1 1 0 0
+  //   0 1 1 0]
+  // A2:
   // [ 1 2 0 0
   //   0 3 4 0]
-  // B:
-  // [ 0 5
-  //   6 0
-  //   0 7
-  //   8 9]
-  // M = A * B
-  //   = [ 12  5
-  //       18 28 ]
-
-  TripletSparseMatrix A_ts(
+  // b: [1 2 3 4]'
+  // A1 * b = [3 5]'
+  // A2 * b = [5 18]'
+  TripletSparseMatrix A1(
+    2,
+    4,
+    {0, 0, 1, 1},
+    {0, 1, 1, 2},
+    {1, 1, 1, 1}
+  );
+  TripletSparseMatrix A2(
     2,
     4,
     {0, 0, 1, 1},
     {0, 1, 1, 2},
     {1, 2, 3, 4}
   );
-  TripletSparseMatrix B_ts(
-    4,
-    2,
-    {0, 1, 2, 3, 3},
-    {1, 0, 1, 0, 1},
-    {5, 6, 7, 8, 9}
-  );
-  TripletSparseMatrix M_expected(
-    2,
-    2,
-    {0, 0, 1, 1},
-    {0, 1, 0, 1},
-    {12, 5, 18, 28}
-  );
-  auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A_ts);
-  auto B_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(B_ts);
-  auto M_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(M_expected);
+  Vector b(4);
+  b << 1, 2, 3, 4;
+
 
   ContextImpl context;
   std::string message;
-  CHECK(context.InitCUDA(&message))
-      << "InitCUDA() failed because: " << message;
-  CudaSparseMatrix A_gpu(&context, *A_crs);
-  CudaSparseMatrix B_gpu(&context, *B_crs);
-  CudaSparseMatrix M_gpu(&context, *A_crs);
-  M_gpu.Multiply(A_gpu, B_gpu);
+  CHECK(context.InitCUDA(&message)) << "InitCUDA() failed because: " << message;
+  auto A1_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A1);
+  CudaSparseMatrix A_gpu(&context, *A1_crs);
+  CudaVector b_gpu(&context, A1.num_cols());
+  CudaVector x_gpu(&context, A1.num_rows());
+  b_gpu.CopyFromCpu(b);
+  x_gpu.SetZero();
 
-  auto M_computed = CompressedRowSparseMatrix::FromTripletSparseMatrix(A_ts);
-  M_gpu.CopyTo(M_computed.get());
+  Vector x_expected(2);
+  x_expected << 3, 5;
+  A_gpu.RightMultiplyAndAccumulate(b_gpu, &x_gpu);
+  Vector x_computed;
+  x_gpu.CopyTo(&x_computed);
+  EXPECT_EQ(x_computed, x_expected);
 
-  EXPECT_EQ(M_crs->num_rows(), M_computed->num_rows());
-  EXPECT_EQ(M_crs->num_cols(), M_computed->num_cols());
-  EXPECT_EQ(M_crs->num_nonzeros(), M_computed->num_nonzeros());
-  for (int i = 0; i < M_crs->num_rows() + 1; ++i) {
-    EXPECT_EQ(M_crs->rows()[i], M_computed->rows()[i]) << "i = " << i;
-  }
-  for (int i = 0; i < M_crs->num_nonzeros(); ++i) {
-    EXPECT_EQ(M_crs->cols()[i], M_computed->cols()[i]) << "i = " << i;
-    EXPECT_EQ(M_crs->values()[i], M_computed->values()[i]) << "i = " << i;
-  }
+  auto A2_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A2);
+  A_gpu.CopyValuesFromCpu(*A2_crs);
+  x_gpu.SetZero();
+  x_expected << 5, 18;
+  A_gpu.RightMultiplyAndAccumulate(b_gpu, &x_gpu);
+  x_gpu.CopyTo(&x_computed);
+  EXPECT_EQ(x_computed, x_expected);
 }
 
 TEST(CudaSparseMatrix, RightMultiplyAndAccumulate) {

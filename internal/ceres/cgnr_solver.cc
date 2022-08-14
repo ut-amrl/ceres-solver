@@ -299,7 +299,7 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
     event_logger.AddEvent("Initialize");
   } else {
     // Assume structure is cached, do a value copy.
-    A_->CopyValues(*A);
+    A_->CopyValuesFromCpu(*A);
     event_logger.AddEvent("A CPU to GPU Transfer");
   }
   b_->CopyFromCpu(ConstVectorRef(b, A->num_rows()));
