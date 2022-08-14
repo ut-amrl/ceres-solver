@@ -249,6 +249,9 @@ std::unique_ptr<CudaCgnrSolver> CudaCgnrSolver::Create(
         std::string(PreconditionerTypeToString(options.preconditioner_type)) + ". ";
     return nullptr;
   }
+  if (!options.context->InitCUDA(error)) {
+    return nullptr;
+  }
   std::unique_ptr<CudaCgnrSolver> solver(new CudaCgnrSolver());
   if (!solver->Init(options, error)) {
     return nullptr;
@@ -270,7 +273,7 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
 
   if (A_ == nullptr) {
     // Assume structure is not cached, do an initialization and structural copy.
-    A_ = CudaSparseMatrix::Create(options_.context, *A);
+    A_ = std::make_unique<CudaSparseMatrix>(options_.context, *A);
     b_ = std::make_unique<CudaVector>(options_.context, A->num_rows());
     x_ = std::make_unique<CudaVector>(options_.context, A->num_cols());
     Atb_ = std::make_unique<CudaVector>(options_.context, A->num_cols());

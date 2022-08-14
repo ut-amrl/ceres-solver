@@ -46,16 +46,12 @@ namespace internal {
 
 #ifndef CERES_NO_CUDA
 
-TEST(CudaSparseMatrix, InvalidOptionOnInit) {
-  CudaSparseMatrix m;
-  ContextImpl* context = nullptr;
-  std::string message;
-  EXPECT_FALSE(m.Init(context, &message));
-}
-
 class CudaSparseMatrixTest : public ::testing::Test {
  protected:
   void SetUp() final {
+    std::string message;
+    CHECK(context_.InitCUDA(&message))
+        << "InitCUDA() failed because: " << message;
     std::unique_ptr<LinearLeastSquaresProblem> problem =
         CreateLinearLeastSquaresProblemFromId(2);
     CHECK(problem != nullptr);
@@ -81,21 +77,21 @@ class CudaSparseMatrixTest : public ::testing::Test {
   ContextImpl context_;
 };
 
-TEST_F(CudaSparseMatrixTest, RightMultiplyTest) {
+TEST_F(CudaSparseMatrixTest, RightMultiplyAndAccumulate) {
   std::string message;
   CompressedRowSparseMatrix A_crs(
       A_->num_rows(), A_->num_cols(), A_->num_nonzeros());
   A_->ToCompressedRowSparseMatrix(&A_crs);
-  auto A_gpu = CudaSparseMatrix::Create(&context_, A_crs);
-  CudaVector x_gpu(&context_, A_gpu->num_cols());
-  CudaVector res_gpu(&context_, A_gpu->num_rows());
+  CudaSparseMatrix A_gpu(&context_, A_crs);
+  CudaVector x_gpu(&context_, A_gpu.num_cols());
+  CudaVector res_gpu(&context_, A_gpu.num_rows());
   x_gpu.CopyFromCpu(x_);
 
   const Vector minus_b = -b_;
   // res = -b
   res_gpu.CopyFromCpu(minus_b);
   // res += A * x
-  A_gpu->RightMultiplyAndAccumulate(x_gpu, &res_gpu);
+  A_gpu.RightMultiplyAndAccumulate(x_gpu, &res_gpu);
 
   Vector res;
   res_gpu.CopyTo(&res);
@@ -107,7 +103,69 @@ TEST_F(CudaSparseMatrixTest, RightMultiplyTest) {
             std::numeric_limits<double>::epsilon() * 1e3);
 }
 
-TEST(CudaSparseMatrix, RightMultiplyTest) {
+TEST(CudaSparseMatrix, Multiply) {
+  // A:
+  // [ 1 2 0 0
+  //   0 3 4 0]
+  // B:
+  // [ 0 5
+  //   6 0
+  //   0 7
+  //   8 9]
+  // M = A * B
+  //   = [ 12  5
+  //       18 28 ]
+
+  TripletSparseMatrix A_ts(
+    2,
+    4,
+    {0, 0, 1, 1},
+    {0, 1, 1, 2},
+    {1, 2, 3, 4}
+  );
+  TripletSparseMatrix B_ts(
+    4,
+    2,
+    {0, 1, 2, 3, 3},
+    {1, 0, 1, 0, 1},
+    {5, 6, 7, 8, 9}
+  );
+  TripletSparseMatrix M_expected(
+    2,
+    2,
+    {0, 0, 1, 1},
+    {0, 1, 0, 1},
+    {12, 5, 18, 28}
+  );
+  auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A_ts);
+  auto B_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(B_ts);
+  auto M_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(M_expected);
+
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaSparseMatrix A_gpu(&context, *A_crs);
+  CudaSparseMatrix B_gpu(&context, *B_crs);
+  CudaSparseMatrix M_gpu(&context, *A_crs);
+  M_gpu.Multiply(A_gpu, B_gpu);
+
+  auto M_computed = CompressedRowSparseMatrix::FromTripletSparseMatrix(A_ts);
+  M_gpu.CopyTo(M_computed.get());
+
+  EXPECT_EQ(M_crs->num_rows(), M_computed->num_rows());
+  EXPECT_EQ(M_crs->num_cols(), M_computed->num_cols());
+  EXPECT_EQ(M_crs->num_nonzeros(), M_computed->num_nonzeros());
+  for (int i = 0; i < M_crs->num_rows() + 1; ++i) {
+    EXPECT_EQ(M_crs->rows()[i], M_computed->rows()[i]) << "i = " << i;
+  }
+  for (int i = 0; i < M_crs->num_nonzeros(); ++i) {
+    EXPECT_EQ(M_crs->cols()[i], M_computed->cols()[i]) << "i = " << i;
+    EXPECT_EQ(M_crs->values()[i], M_computed->values()[i]) << "i = " << i;
+  }
+}
+
+TEST(CudaSparseMatrix, RightMultiplyAndAccumulate) {
   // A:
   // [ 1 2 0 0
   //   0 3 4 0]
@@ -129,14 +187,13 @@ TEST(CudaSparseMatrix, RightMultiplyTest) {
   std::string message;
   CHECK(context.InitCUDA(&message)) << "InitCUDA() failed because: " << message;
   auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A);
-  auto A_gpu = CudaSparseMatrix::Create(&context, *A_crs);
+  CudaSparseMatrix A_gpu(&context, *A_crs);
   CudaVector b_gpu(&context, A.num_cols());
   CudaVector x_gpu(&context, A.num_rows());
-  EXPECT_NE(A_gpu, nullptr);
   b_gpu.CopyFromCpu(b);
   x_gpu.SetZero();
 
-  A_gpu->RightMultiplyAndAccumulate(b_gpu, &x_gpu);
+  A_gpu.RightMultiplyAndAccumulate(b_gpu, &x_gpu);
 
   Vector x_computed;
   x_gpu.CopyTo(&x_computed);
@@ -144,7 +201,7 @@ TEST(CudaSparseMatrix, RightMultiplyTest) {
   EXPECT_EQ(x_computed, x_expected);
 }
 
-TEST(CudaSparseMatrix, LeftMultiplyTest) {
+TEST(CudaSparseMatrix, LeftMultiplyAndAccumulate) {
   // A:
   // [ 1 2 0 0
   //   0 3 4 0]
@@ -163,15 +220,17 @@ TEST(CudaSparseMatrix, LeftMultiplyTest) {
   x_expected << 1, 8, 8, 0;
 
   ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
   auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A);
-  auto A_gpu = CudaSparseMatrix::Create(&context, *A_crs);
+  CudaSparseMatrix A_gpu(&context, *A_crs);
   CudaVector b_gpu(&context, A.num_rows());
   CudaVector x_gpu(&context, A.num_cols());
-  EXPECT_NE(A_gpu, nullptr);
   b_gpu.CopyFromCpu(b);
   x_gpu.SetZero();
 
-  A_gpu->LeftMultiplyAndAccumulate(b_gpu, &x_gpu);
+  A_gpu.LeftMultiplyAndAccumulate(b_gpu, &x_gpu);
 
   Vector x_computed;
   x_gpu.CopyTo(&x_computed);
@@ -179,7 +238,7 @@ TEST(CudaSparseMatrix, LeftMultiplyTest) {
   EXPECT_EQ(x_computed, x_expected);
 }
 
-TEST(CudaSparseMatrix, LargeMultiplyTest) {
+TEST(CudaSparseMatrix, LargeMultiplyAndAccumulate) {
   // Create a large NxN matrix A that has the following structure:
   // In row i, only columns i and i+1 are non-zero.
   // A_{i, i} = A_{i, i+1} = 1.
@@ -213,18 +272,20 @@ TEST(CudaSparseMatrix, LargeMultiplyTest) {
   }
 
   ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
   auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A);
-  auto A_gpu = CudaSparseMatrix::Create(&context, *A_crs);
+  CudaSparseMatrix A_gpu(&context, *A_crs);
   CudaVector b_gpu(&context, N);
   CudaVector x_gpu(&context, N);
-  EXPECT_NE(A_gpu, nullptr);
   x_gpu.CopyFromCpu(x);
 
 
   // First check RightMultiply.
   {
     b_gpu.SetZero();
-    A_gpu->RightMultiplyAndAccumulate(x_gpu, &b_gpu);
+    A_gpu.RightMultiplyAndAccumulate(x_gpu, &b_gpu);
     Vector b_computed;
     b_gpu.CopyTo(&b_computed);
     for (int i = 0; i < N; ++i) {
@@ -239,7 +300,7 @@ TEST(CudaSparseMatrix, LargeMultiplyTest) {
   // Next check LeftMultiply.
   {
     b_gpu.SetZero();
-    A_gpu->LeftMultiplyAndAccumulate(x_gpu, &b_gpu);
+    A_gpu.LeftMultiplyAndAccumulate(x_gpu, &b_gpu);
     Vector b_computed;
     b_gpu.CopyTo(&b_computed);
     for (int i = 0; i < N; ++i) {

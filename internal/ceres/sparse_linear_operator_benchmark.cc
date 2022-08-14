@@ -162,8 +162,12 @@ static void BM_CudaRightMultiplyAndAccumulate(benchmark::State& state) {
   ContextImpl context;
   std::string message;
   context.InitCUDA(&message);
-  CudaSparseMatrix cuda_jacobian;
-  cuda_jacobian.Init(&context, &message);
+  CompressedRowSparseMatrix jacobian_crs(
+      jacobian->num_rows(),
+      jacobian->num_cols(),
+      jacobian->num_nonzeros());
+  jacobian->ToCompressedRowSparseMatrix(&jacobian_crs);
+  CudaSparseMatrix cuda_jacobian(&context, jacobian_crs);
   CudaVector cuda_x(&context, 0);
   CudaVector cuda_y(&context, 0);
 
@@ -172,7 +176,6 @@ static void BM_CudaRightMultiplyAndAccumulate(benchmark::State& state) {
   x.setRandom();
   y.setRandom();
 
-  cuda_jacobian.CopyFrom(*jacobian);
   cuda_x.CopyFromCpu(x);
   cuda_y.CopyFromCpu(y);
   double sum = 0;
@@ -196,8 +199,12 @@ static void BM_CudaLeftMultiplyAndAccumulate(benchmark::State& state) {
   ContextImpl context;
   std::string message;
   context.InitCUDA(&message);
-  CudaSparseMatrix cuda_jacobian;
-  cuda_jacobian.Init(&context, &message);
+  CompressedRowSparseMatrix jacobian_crs(
+      jacobian->num_rows(),
+      jacobian->num_cols(),
+      jacobian->num_nonzeros());
+  jacobian->ToCompressedRowSparseMatrix(&jacobian_crs);
+  CudaSparseMatrix cuda_jacobian(&context, jacobian_crs);
   CudaVector cuda_x(&context, 0);
   CudaVector cuda_y(&context, 0);
 
@@ -206,7 +213,6 @@ static void BM_CudaLeftMultiplyAndAccumulate(benchmark::State& state) {
   x.setRandom();
   y.setRandom();
 
-  cuda_jacobian.CopyFrom(*jacobian);
   cuda_x.CopyFromCpu(x);
   cuda_y.CopyFromCpu(y);
   double sum = 0;

@@ -58,55 +58,17 @@
 
 namespace ceres::internal {
 
-std::unique_ptr<CudaSparseMatrix> CudaSparseMatrix::Create(
-      ContextImpl* context,
-      const CompressedRowSparseMatrix& crs_matrix) {
-  if (context == nullptr || !context->InitCUDA(nullptr)) {
-    return nullptr;
-  }
-  return std::unique_ptr<CudaSparseMatrix>(
-      new CudaSparseMatrix(context, crs_matrix));
-}
-
 CudaSparseMatrix::CudaSparseMatrix(
       ContextImpl* context,
-      const CompressedRowSparseMatrix& crs_matrix) :
-    context_(context) {
+      const CompressedRowSparseMatrix& crs_matrix) {
+  DCHECK_NE(context, nullptr);
+  CHECK(context->IsCUDAInitialized());
+  context_ = context;
   CopyFrom(crs_matrix);
 }
 
-bool CudaSparseMatrix::Init(ContextImpl* context, std::string* message) {
-  if (context == nullptr) {
-    if (message) *message = "CudaVector::Init: context is nullptr";
-    return false;
-  }
-  if (!context->InitCUDA(message)) {
-    if (message) *message = "CudaVector::Init: context->InitCUDA() failed";
-    return false;
-  }
-  context_ = context;
-  return true;
-}
-
-void CudaSparseMatrix::CopyFrom(const CRSMatrix& crs_matrix) {
-  csr_row_indices_.CopyFromCpuVector(crs_matrix.rows, context_->stream_);
-  csr_col_indices_.CopyFromCpuVector(crs_matrix.cols, context_->stream_);
-  csr_values_.CopyFromCpuVector(crs_matrix.values, context_->stream_);
-  num_rows_ = crs_matrix.num_rows;
-  num_cols_ = crs_matrix.num_cols;
-  num_nonzeros_ = crs_matrix.values.size();
+CudaSparseMatrix::~CudaSparseMatrix() {
   DestroyDescriptor();
-  cusparseCreateCsr(&csr_descr_,
-                    num_rows_,
-                    num_cols_,
-                    num_nonzeros_,
-                    csr_row_indices_.data(),
-                    csr_col_indices_.data(),
-                    csr_values_.data(),
-                    CUSPARSE_INDEX_32I,
-                    CUSPARSE_INDEX_32I,
-                    CUSPARSE_INDEX_BASE_ZERO,
-                    CUDA_R_64F);
 }
 
 void CudaSparseMatrix::CopyFrom(const CompressedRowSparseMatrix& crs_matrix) {
@@ -120,7 +82,7 @@ void CudaSparseMatrix::CopyFrom(const CompressedRowSparseMatrix& crs_matrix) {
   csr_values_.CopyFromCpu(
       crs_matrix.values(), num_nonzeros_, context_->stream_);
   DestroyDescriptor();
-  cusparseCreateCsr(&csr_descr_,
+  cusparseCreateCsr(&descr_,
                     num_rows_,
                     num_cols_,
                     num_nonzeros_,
@@ -131,6 +93,14 @@ void CudaSparseMatrix::CopyFrom(const CompressedRowSparseMatrix& crs_matrix) {
                     CUSPARSE_INDEX_32I,
                     CUSPARSE_INDEX_BASE_ZERO,
                     CUDA_R_64F);
+}
+
+void CudaSparseMatrix::CopyTo(CompressedRowSparseMatrix* crs_matrix) {
+  *crs_matrix = CompressedRowSparseMatrix(
+      num_rows_, num_cols_, num_nonzeros_);
+  csr_row_indices_.CopyToCpu(crs_matrix->mutable_rows(), num_rows_ + 1);
+  csr_col_indices_.CopyToCpu(crs_matrix->mutable_cols(), num_nonzeros_);
+  csr_values_.CopyToCpu(crs_matrix->mutable_values(), num_nonzeros_);
 }
 
 void CudaSparseMatrix::CopyValues(const CompressedRowSparseMatrix& crs_matrix) {
@@ -152,7 +122,7 @@ void CudaSparseMatrix::Resize(int num_rows, int num_cols, int num_nnz) {
   csr_values_.Reserve(num_nnz);
   num_nonzeros_ = num_nnz;
   DestroyDescriptor();
-  cusparseCreateCsr(&csr_descr_,
+  cusparseCreateCsr(&descr_,
                     num_rows_,
                     num_cols_,
                     num_nonzeros_,
@@ -174,9 +144,9 @@ void CudaSparseMatrix::CopyFrom(const BlockSparseMatrix& bs_matrix) {
 }
 
 void CudaSparseMatrix::DestroyDescriptor() {
-  if (csr_descr_) {
-    CHECK_EQ(cusparseDestroySpMat(csr_descr_), CUSPARSE_STATUS_SUCCESS);
-    csr_descr_ = nullptr;
+  if (descr_) {
+    CHECK_EQ(cusparseDestroySpMat(descr_), CUSPARSE_STATUS_SUCCESS);
+    descr_ = nullptr;
   }
 }
 
@@ -188,7 +158,7 @@ void CudaSparseMatrix::CopyFromTranspose(const CudaSparseMatrix& other) {
   csr_col_indices_.Reserve(csr_values_.size());
   num_nonzeros_ = other.num_nonzeros_;
   DestroyDescriptor();
-  cusparseCreateCsr(&csr_descr_,
+  cusparseCreateCsr(&descr_,
                     num_rows_,
                     num_cols_,
                     num_nonzeros_,
@@ -239,17 +209,15 @@ void CudaSparseMatrix::CopyFromTranspose(const CudaSparseMatrix& other) {
 
 void CudaSparseMatrix::Multiply(const CudaSparseMatrix& A,
                                 const CudaSparseMatrix& B) {
-  printf("A has %d nonzeros\n", A.num_nonzeros());
-  printf("B has %d nonzeros\n", B.num_nonzeros());
   // Create a temporary descriptor for the matrix M -- we don't yet know the
   // number of nonzeros, so we just set it to 1 to allocate some non-zero
   // memory.
+  CHECK_EQ(A.num_cols_, B.num_rows_);
   num_rows_ = A.num_rows_;
   num_cols_ = B.num_cols_;
-  printf("Resizing M to %d x %d\n", num_rows_, num_cols_);
   DestroyDescriptor();
   CHECK_EQ(cusparseCreateCsr(
-      &csr_descr_,
+      &descr_,
       num_rows_,
       num_cols_,
       0,
@@ -273,13 +241,12 @@ void CudaSparseMatrix::Multiply(const CudaSparseMatrix& A,
       A.descr(),
       B.descr(),
       &beta,
-      csr_descr_,
+      descr_,
       CUDA_R_64F,
       CUSPARSE_SPGEMM_DEFAULT,
       spgemm_desc,
       &buffer1_size,
       nullptr), CUSPARSE_STATUS_SUCCESS);
-  printf("buffer1_size = %lu\n", buffer1_size);
 
   CudaBuffer<uint8_t> buffer1;
   buffer1.Reserve(buffer1_size);
@@ -291,7 +258,7 @@ void CudaSparseMatrix::Multiply(const CudaSparseMatrix& A,
       A.descr(),
       B.descr(),
       &beta,
-      csr_descr_,
+      descr_,
       CUDA_R_64F,
       CUSPARSE_SPGEMM_DEFAULT,
       spgemm_desc,
@@ -307,15 +274,16 @@ void CudaSparseMatrix::Multiply(const CudaSparseMatrix& A,
       A.descr(),
       B.descr(),
       &beta,
-      csr_descr_,
+      descr_,
       CUDA_R_64F,
       CUSPARSE_SPGEMM_DEFAULT,
       spgemm_desc,
       &buffer2_size,
       nullptr), CUSPARSE_STATUS_SUCCESS);
-  printf("buffer2_size = %lu\n", buffer2_size);
 
-  // Allocate at most 1 GB of memory for the operation.
+  // buffer2_size is an upper bound of the memory required for the computation,
+  // and is generally several times larger than what is actually used. Hence
+  // allocate at most 1 GB of memory for the operation.
   buffer2_size = std::min<size_t>(buffer2_size, 1lu << 34);
   static CudaBuffer<uint8_t> buffer2;
   buffer2.Reserve(buffer2_size);
@@ -327,7 +295,7 @@ void CudaSparseMatrix::Multiply(const CudaSparseMatrix& A,
       A.descr(),
       B.descr(),
       &beta,
-      csr_descr_,
+      descr_,
       CUDA_R_64F,
       CUSPARSE_SPGEMM_DEFAULT,
       spgemm_desc,
@@ -336,13 +304,10 @@ void CudaSparseMatrix::Multiply(const CudaSparseMatrix& A,
 
   int64_t new_num_rows, new_num_cols, new_nnz;
   CHECK_EQ(cusparseSpMatGetSize(
-      csr_descr_,
+      descr_,
       &new_num_rows,
       &new_num_cols,
       &new_nnz), CUSPARSE_STATUS_SUCCESS);
-  printf("new_num_rows = %d\n", int(new_num_rows));
-  printf("new_num_cols = %d\n", int(new_num_cols));
-  printf("new_nnz = %d\n", int(new_nnz));
   // CHECK_NE(new_nnz, 0);
   Resize(new_num_rows, new_num_cols, new_nnz);
   CHECK_EQ(cusparseSpGEMM_copy(
@@ -353,16 +318,10 @@ void CudaSparseMatrix::Multiply(const CudaSparseMatrix& A,
       A.descr(),
       B.descr(),
       &beta,
-      csr_descr_,
+      descr_,
       CUDA_R_64F,
       CUSPARSE_SPGEMM_DEFAULT,
       spgemm_desc), CUSPARSE_STATUS_SUCCESS);
-}
-
-void CudaSparseMatrix::CopyFrom(const TripletSparseMatrix& ts_matrix) {
-  CRSMatrix crs_matrix;
-  ts_matrix.ToCRSMatrix(&crs_matrix);
-  CopyFrom(crs_matrix);
 }
 
 void CudaSparseMatrix::SpMv(cusparseOperation_t op,
@@ -375,7 +334,7 @@ void CudaSparseMatrix::SpMv(cusparseOperation_t op,
   CHECK_EQ(cusparseSpMV_bufferSize(context_->cusparse_handle_,
                                    op,
                                    &alpha,
-                                   csr_descr_,
+                                   descr_,
                                    x.descr(),
                                    &beta,
                                    y->descr(),
@@ -387,7 +346,7 @@ void CudaSparseMatrix::SpMv(cusparseOperation_t op,
   CHECK_EQ(cusparseSpMV(context_->cusparse_handle_,
                         op,
                         &alpha,
-                        csr_descr_,
+                        descr_,
                         x.descr(),
                         &beta,
                         y->descr(),

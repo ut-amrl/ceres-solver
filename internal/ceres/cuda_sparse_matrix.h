@@ -57,15 +57,18 @@
 
 namespace ceres::internal {
 
+// A sparse matrix hosted on the GPU in compressed row sparse format, with
+// CUDA-accelerated operations.
 class CERES_NO_EXPORT CudaSparseMatrix {
  public:
-  CudaSparseMatrix() {};
 
-  static std::unique_ptr<CudaSparseMatrix> Create(
-      ContextImpl* context,
-      const CompressedRowSparseMatrix& crs_matrix);
+  // Create a GPU copy of the matrix provided. The caller must ensure that
+  // InitCuda() has already been successfully called on context before calling
+  // this constructor.
+  CudaSparseMatrix(ContextImpl* context,
+                   const CompressedRowSparseMatrix& crs_matrix);
 
-  bool Init(ContextImpl* context, std::string* message);
+  ~CudaSparseMatrix();
 
   // y = y + Ax;
   void RightMultiplyAndAccumulate(const CudaVector& x, CudaVector* y);
@@ -76,16 +79,15 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   int num_cols() const { return num_cols_; }
   int num_nonzeros() const { return num_nonzeros_; }
 
-  void CopyFrom(const CRSMatrix& crs_matrix);
   void CopyFrom(const BlockSparseMatrix& bs_matrix);
-  void CopyFrom(const TripletSparseMatrix& ts_matrix);
   void CopyFrom(const CompressedRowSparseMatrix& crs_matrix);
   void CopyValues(const CompressedRowSparseMatrix& crs_matrix);
+  void CopyTo(CompressedRowSparseMatrix* crs_matrix);
 
   // Set this matrix as the transpose of the other given matrix.
   void CopyFromTranspose(const CudaSparseMatrix& other);
 
-  const cusparseSpMatDescr_t& descr() const { return csr_descr_; }
+  const cusparseSpMatDescr_t& descr() const { return descr_; }
 
   void Resize(int num_rows, int num_cols, int num_nnz);
 
@@ -93,8 +95,7 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   void Multiply(const CudaSparseMatrix& A, const CudaSparseMatrix& B);
 
  private:
-  CudaSparseMatrix(ContextImpl* context,
-                   const CompressedRowSparseMatrix& crs_matrix);
+  CudaSparseMatrix() = delete;
 
   // Disable copy and assignment.
   CudaSparseMatrix(const CudaSparseMatrix&) = delete;
@@ -103,7 +104,8 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   // Destroy the cuSparse matrix descriptor if it exists.
   void DestroyDescriptor();
 
-  // y = y + op(M)x.
+  // y = y + op(M)x. op must be either CUSPARSE_OPERATION_NON_TRANSPOSE or
+  // CUSPARSE_OPERATION_TRANSPOSE.
   void SpMv(cusparseOperation_t op, const CudaVector& x, CudaVector* y);
 
   int num_rows_ = 0;
@@ -120,7 +122,7 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   ContextImpl* context_ = nullptr;
 
   // CuSparse object that describes this matrix.
-  cusparseSpMatDescr_t csr_descr_ = nullptr;
+  cusparseSpMatDescr_t descr_ = nullptr;
 
   CudaBuffer<uint8_t> buffer_;
 };
