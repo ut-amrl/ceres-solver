@@ -50,21 +50,16 @@
 
 namespace ceres::internal {
 
-std::unique_ptr<CudaVector> CudaVector::Create(ContextImpl* context, int size) {
-  if (context == nullptr || !context->InitCUDA(nullptr)) {
-    return nullptr;
-  }
-  return std::unique_ptr<CudaVector>(new CudaVector(context, size));
-}
-
-CudaVector::CudaVector(ContextImpl* context, int size) :
-    context_(context) {
-  resize(size);
+CudaVector::CudaVector(ContextImpl* context, int size) {
+  DCHECK_NE(context, nullptr);
+  CHECK(context->IsCUDAInitialized());
+  context_ = context;
+  Resize(size);
 }
 
 CudaVector& CudaVector::operator=(const CudaVector& other) {
   if (this != &other) {
-    resize(other.num_rows());
+    Resize(other.num_rows());
     data_.CopyFromGPUArray(other.data_.data(), num_rows_, context_->stream_);
   }
   return *this;
@@ -84,7 +79,7 @@ bool CudaVector::Init(ContextImpl* context, std::string* message) {
   return true;
 }
 
-void CudaVector::resize(int size) {
+void CudaVector::Resize(int size) {
   data_.Reserve(size);
   num_rows_ = size;
   cusparseCreateDnVec(&cusparse_descr_,
@@ -93,7 +88,7 @@ void CudaVector::resize(int size) {
                       CUDA_R_64F);
 }
 
-double CudaVector::dot(const CudaVector& x) const {
+double CudaVector::Dot(const CudaVector& x) const {
   double result = 0;
   CHECK_EQ(cublasDdot(context_->cublas_handle_,
                       num_rows_,
@@ -105,7 +100,7 @@ double CudaVector::dot(const CudaVector& x) const {
   return result;
 }
 
-double CudaVector::norm() const {
+double CudaVector::Norm() const {
   double result = 0;
   CHECK_EQ(cublasDnrm2(context_->cublas_handle_,
                        num_rows_,
@@ -120,16 +115,6 @@ void CudaVector::CopyFromCpu(const Vector& x) {
   data_.Reserve(x.rows());
   data_.CopyFromCpu(x.data(), x.rows(), context_->stream_);
   num_rows_ = x.rows();
-  cusparseCreateDnVec(&cusparse_descr_,
-                      num_rows_,
-                      data_.data(),
-                      CUDA_R_64F);
-}
-
-void CudaVector::CopyFromCpu(const double* x, int size) {
-  data_.Reserve(size);
-  data_.CopyFromCpu(x, size, context_->stream_);
-  num_rows_ = size;
   cusparseCreateDnVec(&cusparse_descr_,
                       num_rows_,
                       data_.data(),
@@ -153,41 +138,22 @@ void CudaVector::CopyTo(double* x) const {
   data_.CopyToCpu(x, num_rows_);
 }
 
-void CudaVector::CopyFromCpu(const CudaVector& x) {
-  data_.CopyNItemsFrom(x.num_rows_, x.data(), context_->stream_);
-  num_rows_ = x.num_rows_;
-  cusparseCreateDnVec(&cusparse_descr_,
-                      num_rows_,
-                      data_.data(),
-                      CUDA_R_64F);
-}
-
-void CudaVector::setZero() {
+void CudaVector::SetZero() {
   CHECK(data_.data() != nullptr);
   CudaSetZeroFP64(data_.data(), num_rows_, context_->stream_);
 }
 
-void CudaVector::Axpy(double a, const CudaVector& x) {
-  CHECK_EQ(num_rows_, x.num_rows_);
-  CHECK_EQ(cublasDaxpy(context_->cublas_handle_,
-                       num_rows_,
-                       &a,
-                       x.data().data(),
-                       1,
-                       data_.data(),
-                       1),
-           CUBLAS_STATUS_SUCCESS) << "CuBLAS cublasDaxpy failed.";
-}
-
 void CudaVector::Axpby(double a, const CudaVector& x, double b) {
   CHECK_EQ(num_rows_, x.num_rows_);
-  // First scale y by b.
-  CHECK_EQ(cublasDscal(context_->cublas_handle_,
-                       num_rows_,
-                       &b,
-                       data_.data(),
-                       1),
-           CUBLAS_STATUS_SUCCESS) << "CuBLAS cublasDscal failed.";
+  if (b != 1.0) {
+    // First scale y by b.
+    CHECK_EQ(cublasDscal(context_->cublas_handle_,
+                        num_rows_,
+                        &b,
+                        data_.data(),
+                        1),
+            CUBLAS_STATUS_SUCCESS) << "CuBLAS cublasDscal failed.";
+  }
   // Then add a * x to y.
   CHECK_EQ(cublasDaxpy(context_->cublas_handle_,
                        num_rows_,

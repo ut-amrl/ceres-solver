@@ -164,10 +164,8 @@ static void BM_CudaRightMultiplyAndAccumulate(benchmark::State& state) {
   context.InitCUDA(&message);
   CudaSparseMatrix cuda_jacobian;
   cuda_jacobian.Init(&context, &message);
-  std::unique_ptr<CudaVector> cuda_x = CudaVector::Create(&context, 0);
-  std::unique_ptr<CudaVector> cuda_y = CudaVector::Create(&context, 0);
-  CHECK_NE(cuda_x.get(), nullptr);
-  CHECK_NE(cuda_y.get(), nullptr);
+  CudaVector cuda_x(&context, 0);
+  CudaVector cuda_y(&context, 0);
 
   Vector x(jacobian->num_cols());
   Vector y(jacobian->num_rows());
@@ -175,13 +173,13 @@ static void BM_CudaRightMultiplyAndAccumulate(benchmark::State& state) {
   y.setRandom();
 
   cuda_jacobian.CopyFrom(*jacobian);
-  cuda_x->CopyFromCpu(x);
-  cuda_y->CopyFromCpu(y);
+  cuda_x.CopyFromCpu(x);
+  cuda_y.CopyFromCpu(y);
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed
-    cuda_jacobian.RightMultiplyAndAccumulate(*cuda_x, cuda_y.get());
-    sum += cuda_y->norm();
+    cuda_jacobian.RightMultiplyAndAccumulate(cuda_x, &cuda_y);
+    sum += cuda_y.Norm();
     CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
   }
   CHECK_NE(sum, 0.0);
@@ -200,10 +198,8 @@ static void BM_CudaLeftMultiplyAndAccumulate(benchmark::State& state) {
   context.InitCUDA(&message);
   CudaSparseMatrix cuda_jacobian;
   cuda_jacobian.Init(&context, &message);
-  std::unique_ptr<CudaVector> cuda_x = CudaVector::Create(&context, 0);
-  std::unique_ptr<CudaVector> cuda_y = CudaVector::Create(&context, 0);
-  CHECK_NE(cuda_x.get(), nullptr);
-  CHECK_NE(cuda_y.get(), nullptr);
+  CudaVector cuda_x(&context, 0);
+  CudaVector cuda_y(&context, 0);
 
   Vector x(jacobian->num_rows());
   Vector y(jacobian->num_cols());
@@ -211,13 +207,13 @@ static void BM_CudaLeftMultiplyAndAccumulate(benchmark::State& state) {
   y.setRandom();
 
   cuda_jacobian.CopyFrom(*jacobian);
-  cuda_x->CopyFromCpu(x);
-  cuda_y->CopyFromCpu(y);
+  cuda_x.CopyFromCpu(x);
+  cuda_y.CopyFromCpu(y);
   double sum = 0;
   for (auto _ : state) {
     // This code gets timed
-    cuda_jacobian.LeftMultiplyAndAccumulate(*cuda_x, cuda_y.get());
-    sum += cuda_y->norm();
+    cuda_jacobian.LeftMultiplyAndAccumulate(cuda_x, &cuda_y);
+    sum += cuda_y.Norm();
     CHECK_EQ(cudaDeviceSynchronize(), cudaSuccess);
   }
   CHECK_NE(sum, 0.0);

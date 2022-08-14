@@ -60,35 +60,29 @@ namespace ceres::internal {
 class CERES_NO_EXPORT CudaVector {
  public:
 
-  // Create a pre-allocated vector of size N and return a pointer to it. If
-  // there are any errors during creation (e.g. Cuda error), nullptr is
-  // returned.
-  static std::unique_ptr<CudaVector> Create(ContextImpl* context, int size);
+  // Create a pre-allocated vector of size N and return a pointer to it. The
+  // caller must ensure that InitCuda() has already been successfully called on
+  // context before calling this method.
+  CudaVector(ContextImpl* context, int size);
 
   ~CudaVector() = default;
 
-  void resize(int size);
+  void Resize(int size);
 
   // Perform a deep copy of the vector.
   CudaVector& operator=(const CudaVector&);
 
   // Return the inner product x' * y.
-  double dot(const CudaVector& x) const;
+  double Dot(const CudaVector& x) const;
 
   // Return the L2 norm of the vector (||y||_2).
-  double norm() const;
+  double Norm() const;
 
   // Set all elements to zero.
-  void setZero();
-
-  // Set y = x.
-  void CopyFromCpu(const CudaVector& x);
+  void SetZero();
 
   // Copy from Eigen vector.
   void CopyFromCpu(const Vector& x);
-
-  // Copy from CPU memory array.
-  void CopyFromCpu(const double* x, int size);
 
   // Copy to Eigen vector.
   void CopyTo(Vector* x) const;
@@ -96,9 +90,6 @@ class CERES_NO_EXPORT CudaVector {
   // Copy to CPU memory array. It is the caller's responsibility to ensure
   // that the array is large enough.
   void CopyTo(double* x) const;
-
-  // y = a * x + y.
-  void Axpy(double a, const CudaVector& x);
 
   // y = a * x + b * y.
   void Axpby(double a, const CudaVector& x, double b);
@@ -112,14 +103,12 @@ class CERES_NO_EXPORT CudaVector {
   int num_rows() const { return num_rows_; }
   int num_cols() const { return 1; }
 
-  // Return the pointer to the GPU buffer.
   const CudaBuffer<double>& data() const { return data_; }
 
   const cusparseDnVecDescr_t& descr() const { return cusparse_descr_; }
 
  private:
   CudaVector(const CudaVector&) = delete;
-  CudaVector(ContextImpl* context, int size);
   bool Init(ContextImpl* context, std::string* message);
 
   int num_rows_ = 0;
@@ -132,8 +121,8 @@ class CERES_NO_EXPORT CudaVector {
 // Blas1 operations on Cuda vectors. These functions are needed as an
 // abstraction layer so that we can use different versions of a vector style
 // object in the conjugate gradients linear solver.
-inline double Norm(const CudaVector& x) { return x.norm(); }
-inline void SetZero(CudaVector& x) { x.setZero(); }
+inline double Norm(const CudaVector& x) { return x.Norm(); }
+inline void SetZero(CudaVector& x) { x.SetZero(); }
 inline void Axpby(
     double a,
     const CudaVector& x,
@@ -158,7 +147,7 @@ inline void Axpby(
     z.Axpby(a, x, b);
   }
 }
-inline double Dot(const CudaVector& x, const CudaVector& y) { return x.dot(y); }
+inline double Dot(const CudaVector& x, const CudaVector& y) { return x.Dot(y); }
 inline void Copy(const CudaVector& from, CudaVector& to) { to = from; }
 
 }  // namespace ceres::internal

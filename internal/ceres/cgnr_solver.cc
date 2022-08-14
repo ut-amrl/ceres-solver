@@ -203,7 +203,7 @@ class CERES_NO_EXPORT CudaCgnrLinearOperator final : public
 
   void RightMultiplyAndAccumulate(const CudaVector& x, CudaVector& y) final {
     // z = Ax
-    z_->setZero();
+    z_->SetZero();
     A_.RightMultiplyAndAccumulate(x, z_);
 
     // y = y + Atz
@@ -271,11 +271,11 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
   if (A_ == nullptr) {
     // Assume structure is not cached, do an initialization and structural copy.
     A_ = CudaSparseMatrix::Create(options_.context, *A);
-    b_ = CudaVector::Create(options_.context, A->num_rows());
-    x_ = CudaVector::Create(options_.context, A->num_cols());
-    Atb_ = CudaVector::Create(options_.context, A->num_cols());
-    Ax_ = CudaVector::Create(options_.context, A->num_rows());
-    D_ = CudaVector::Create(options_.context, A->num_cols());
+    b_ = std::make_unique<CudaVector>(options_.context, A->num_rows());
+    x_ = std::make_unique<CudaVector>(options_.context, A->num_cols());
+    Atb_ = std::make_unique<CudaVector>(options_.context, A->num_cols());
+    Ax_ = std::make_unique<CudaVector>(options_.context, A->num_rows());
+    D_ = std::make_unique<CudaVector>(options_.context, A->num_cols());
     if (A_ == nullptr ||
         b_ == nullptr ||
         x_ == nullptr ||
@@ -286,7 +286,8 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
       return summary;
     }
     for (int i = 0; i < 4; ++i) {
-      scratch_[i] = CudaVector::Create(options_.context, A->num_cols());
+      scratch_[i] = std::make_unique<CudaVector>(
+          options_.context, A->num_cols());
       if (scratch_[i] == nullptr) {
         summary.message = "CudaVector::Create failed.";
         return summary;
@@ -298,12 +299,12 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
     A_->CopyValues(*A);
     event_logger.AddEvent("A CPU to GPU Transfer");
   }
-  b_->CopyFromCpu(b, A->num_rows());
-  D_->CopyFromCpu(per_solve_options.D, A->num_cols());
+  b_->CopyFromCpu(ConstVectorRef(b, A->num_rows()));
+  D_->CopyFromCpu(ConstVectorRef(per_solve_options.D, A->num_cols()));
   event_logger.AddEvent("b CPU to GPU Transfer");
 
   // Form z = Atb.
-  Atb_->setZero();
+  Atb_->SetZero();
   A_->LeftMultiplyAndAccumulate(*b_, Atb_.get());
   if (kDebug) printf("z = Atb\n");
 
@@ -311,7 +312,7 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
   cg_per_solve_options.preconditioner = nullptr;
 
   // Solve (AtA + DtD)x = z (= Atb).
-  x_->setZero();
+  x_->SetZero();
   CudaCgnrLinearOperator lhs(*A_, D_.get(), Ax_.get());
 
   event_logger.AddEvent("Setup");

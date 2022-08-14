@@ -87,18 +87,18 @@ TEST_F(CudaSparseMatrixTest, RightMultiplyTest) {
       A_->num_rows(), A_->num_cols(), A_->num_nonzeros());
   A_->ToCompressedRowSparseMatrix(&A_crs);
   auto A_gpu = CudaSparseMatrix::Create(&context_, A_crs);
-  auto x_gpu = CudaVector::Create(&context_, A_gpu->num_cols());
-  auto res_gpu = CudaVector::Create(&context_, A_gpu->num_rows());
-  x_gpu->CopyFromCpu(x_);
+  CudaVector x_gpu(&context_, A_gpu->num_cols());
+  CudaVector res_gpu(&context_, A_gpu->num_rows());
+  x_gpu.CopyFromCpu(x_);
 
   const Vector minus_b = -b_;
   // res = -b
-  res_gpu->CopyFromCpu(minus_b);
+  res_gpu.CopyFromCpu(minus_b);
   // res += A * x
-  A_gpu->RightMultiplyAndAccumulate(*x_gpu, res_gpu.get());
+  A_gpu->RightMultiplyAndAccumulate(x_gpu, &res_gpu);
 
   Vector res;
-  res_gpu->CopyTo(&res);
+  res_gpu.CopyTo(&res);
 
   Vector res_expected = minus_b;
   A_->RightMultiplyAndAccumulate(x_.data(), res_expected.data());
@@ -126,20 +126,20 @@ TEST(CudaSparseMatrix, RightMultiplyTest) {
   x_expected << 5, 18;
 
   ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message)) << "InitCUDA() failed because: " << message;
   auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A);
   auto A_gpu = CudaSparseMatrix::Create(&context, *A_crs);
-  auto b_gpu = CudaVector::Create(&context, A.num_cols());
-  auto x_gpu = CudaVector::Create(&context, A.num_rows());
+  CudaVector b_gpu(&context, A.num_cols());
+  CudaVector x_gpu(&context, A.num_rows());
   EXPECT_NE(A_gpu, nullptr);
-  EXPECT_NE(b_gpu, nullptr);
-  EXPECT_NE(x_gpu, nullptr);
-  b_gpu->CopyFromCpu(b);
-  x_gpu->setZero();
+  b_gpu.CopyFromCpu(b);
+  x_gpu.SetZero();
 
-  A_gpu->RightMultiplyAndAccumulate(*b_gpu, x_gpu.get());
+  A_gpu->RightMultiplyAndAccumulate(b_gpu, &x_gpu);
 
   Vector x_computed;
-  x_gpu->CopyTo(&x_computed);
+  x_gpu.CopyTo(&x_computed);
 
   EXPECT_EQ(x_computed, x_expected);
 }
@@ -165,18 +165,16 @@ TEST(CudaSparseMatrix, LeftMultiplyTest) {
   ContextImpl context;
   auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A);
   auto A_gpu = CudaSparseMatrix::Create(&context, *A_crs);
-  auto b_gpu = CudaVector::Create(&context, A.num_rows());
-  auto x_gpu = CudaVector::Create(&context, A.num_cols());
+  CudaVector b_gpu(&context, A.num_rows());
+  CudaVector x_gpu(&context, A.num_cols());
   EXPECT_NE(A_gpu, nullptr);
-  EXPECT_NE(b_gpu, nullptr);
-  EXPECT_NE(x_gpu, nullptr);
-  b_gpu->CopyFromCpu(b);
-  x_gpu->setZero();
+  b_gpu.CopyFromCpu(b);
+  x_gpu.SetZero();
 
-  A_gpu->LeftMultiplyAndAccumulate(*b_gpu, x_gpu.get());
+  A_gpu->LeftMultiplyAndAccumulate(b_gpu, &x_gpu);
 
   Vector x_computed;
-  x_gpu->CopyTo(&x_computed);
+  x_gpu.CopyTo(&x_computed);
 
   EXPECT_EQ(x_computed, x_expected);
 }
@@ -217,20 +215,18 @@ TEST(CudaSparseMatrix, LargeMultiplyTest) {
   ContextImpl context;
   auto A_crs = CompressedRowSparseMatrix::FromTripletSparseMatrix(A);
   auto A_gpu = CudaSparseMatrix::Create(&context, *A_crs);
-  auto b_gpu = CudaVector::Create(&context, N);
-  auto x_gpu = CudaVector::Create(&context, N);
+  CudaVector b_gpu(&context, N);
+  CudaVector x_gpu(&context, N);
   EXPECT_NE(A_gpu, nullptr);
-  EXPECT_NE(b_gpu, nullptr);
-  EXPECT_NE(x_gpu, nullptr);
-  x_gpu->CopyFromCpu(x);
+  x_gpu.CopyFromCpu(x);
 
 
   // First check RightMultiply.
   {
-    b_gpu->setZero();
-    A_gpu->RightMultiplyAndAccumulate(*x_gpu, b_gpu.get());
+    b_gpu.SetZero();
+    A_gpu->RightMultiplyAndAccumulate(x_gpu, &b_gpu);
     Vector b_computed;
-    b_gpu->CopyTo(&b_computed);
+    b_gpu.CopyTo(&b_computed);
     for (int i = 0; i < N; ++i) {
       if (i + 1 < N) {
         EXPECT_EQ(b_computed[i], 2 * (i + 1) + 1);
@@ -242,10 +238,10 @@ TEST(CudaSparseMatrix, LargeMultiplyTest) {
 
   // Next check LeftMultiply.
   {
-    b_gpu->setZero();
-    A_gpu->LeftMultiplyAndAccumulate(*x_gpu, b_gpu.get());
+    b_gpu.SetZero();
+    A_gpu->LeftMultiplyAndAccumulate(x_gpu, &b_gpu);
     Vector b_computed;
-    b_gpu->CopyTo(&b_computed);
+    b_gpu.CopyTo(&b_computed);
     for (int i = 0; i < N; ++i) {
       if (i > 0) {
         EXPECT_EQ(b_computed[i], 2 * (i + 1) - 1);
