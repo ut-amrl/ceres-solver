@@ -65,27 +65,25 @@ CudaVector& CudaVector::operator=(const CudaVector& other) {
   return *this;
 }
 
-bool CudaVector::Init(ContextImpl* context, std::string* message) {
-  CHECK(message != nullptr);
-  if (context == nullptr) {
-    *message = "CudaVector::Init: context is nullptr";
-    return false;
+void CudaVector::DestroyDescriptor() {
+  if (descr_ != nullptr) {
+    CHECK_EQ(cusparseDestroyDnVec(descr_), CUSPARSE_STATUS_SUCCESS);
+    descr_ = nullptr;
   }
-  if (!context->InitCUDA(message)) {
-    *message = "CudaVector::Init: context->InitCUDA() failed";
-    return false;
-  }
-  context_ = context;
-  return true;
+}
+
+CudaVector::~CudaVector() {
+  DestroyDescriptor();
 }
 
 void CudaVector::Resize(int size) {
   data_.Reserve(size);
   num_rows_ = size;
-  cusparseCreateDnVec(&cusparse_descr_,
-                      num_rows_,
-                      data_.data(),
-                      CUDA_R_64F);
+  DestroyDescriptor();
+  CHECK_EQ(cusparseCreateDnVec(&descr_,
+                               num_rows_,
+                               data_.data(),
+                               CUDA_R_64F), CUSPARSE_STATUS_SUCCESS);
 }
 
 double CudaVector::Dot(const CudaVector& x) const {
@@ -115,10 +113,11 @@ void CudaVector::CopyFromCpu(const Vector& x) {
   data_.Reserve(x.rows());
   data_.CopyFromCpu(x.data(), x.rows(), context_->stream_);
   num_rows_ = x.rows();
-  cusparseCreateDnVec(&cusparse_descr_,
-                      num_rows_,
-                      data_.data(),
-                      CUDA_R_64F);
+  DestroyDescriptor();
+  CHECK_EQ(cusparseCreateDnVec(&descr_,
+                               num_rows_,
+                               data_.data(),
+                               CUDA_R_64F), CUSPARSE_STATUS_SUCCESS);
 }
 
 void CudaVector::CopyTo(Vector* x) const {
@@ -144,6 +143,10 @@ void CudaVector::SetZero() {
 }
 
 void CudaVector::Axpby(double a, const CudaVector& x, double b) {
+  if (&x == this) {
+    Scale(a + b);
+    return;
+  }
   CHECK_EQ(num_rows_, x.num_rows_);
   if (b != 1.0) {
     // First scale y by b.

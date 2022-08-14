@@ -65,7 +65,7 @@ class CERES_NO_EXPORT CudaVector {
   // context before calling this method.
   CudaVector(ContextImpl* context, int size);
 
-  ~CudaVector() = default;
+  ~CudaVector();
 
   void Resize(int size);
 
@@ -105,17 +105,17 @@ class CERES_NO_EXPORT CudaVector {
 
   const CudaBuffer<double>& data() const { return data_; }
 
-  const cusparseDnVecDescr_t& descr() const { return cusparse_descr_; }
+  const cusparseDnVecDescr_t& descr() const { return descr_; }
 
  private:
   CudaVector(const CudaVector&) = delete;
-  bool Init(ContextImpl* context, std::string* message);
+  void DestroyDescriptor();
 
   int num_rows_ = 0;
   ContextImpl* context_ = nullptr;
   CudaBuffer<double> data_;
   // CuSparse object that describes this dense vector.
-  cusparseDnVecDescr_t cusparse_descr_ = nullptr;
+  cusparseDnVecDescr_t descr_ = nullptr;
 };
 
 // Blas1 operations on Cuda vectors. These functions are needed as an

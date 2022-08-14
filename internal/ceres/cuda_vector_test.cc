@@ -180,153 +180,197 @@ TEST(CudaVector, Axpy) {
   EXPECT_EQ(result, expected);
 }
 
-TEST(CudaVector, Axpby) {
-  {
-    Vector x(4);
-    Vector y(4);
-    x << 1, 1, 1, 1;
-    y << 100, 10, 1, 0;
-    ContextImpl context;
-    std::string message;
-    CHECK(context.InitCUDA(&message))
-        << "InitCUDA() failed because: " << message;
-    CudaVector x_gpu(&context, 4);
-    CudaVector y_gpu(&context, 4);
-    x_gpu.CopyFromCpu(x);
-    y_gpu.CopyFromCpu(y);
+TEST(CudaVector, AxpbyBEquals1) {
+  Vector x(4);
+  Vector y(4);
+  x << 1, 1, 1, 1;
+  y << 100, 10, 1, 0;
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaVector x_gpu(&context, 4);
+  CudaVector y_gpu(&context, 4);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
 
-    x_gpu.Axpby(2.0, y_gpu, 1.0);
-    Vector result;
-    Vector expected(4);
-    expected << 201, 21, 3, 1;
-    x_gpu.CopyTo(&result);
-    EXPECT_EQ(result, expected);
-  }
-  {
-    Vector x(4);
-    Vector y(4);
-    x << 1, 1, 1, 1;
-    y << 100, 10, 1, 0;
-    ContextImpl context;
-    std::string message;
-    CHECK(context.InitCUDA(&message))
-        << "InitCUDA() failed because: " << message;
-    CudaVector x_gpu(&context, 4);
-    CudaVector y_gpu(&context, 4);
-    x_gpu.CopyFromCpu(x);
-    y_gpu.CopyFromCpu(y);
+  x_gpu.Axpby(2.0, y_gpu, 1.0);
+  Vector result;
+  Vector expected(4);
+  expected << 201, 21, 3, 1;
+  x_gpu.CopyTo(&result);
+  EXPECT_EQ(result, expected);
+}
 
-    x_gpu.Axpby(2.0, y_gpu, 3.0);
-    Vector result;
-    Vector expected(4);
-    expected << 203, 23, 5, 3;
-    x_gpu.CopyTo(&result);
-    EXPECT_EQ(result, expected);
-  }
-  {
-    Vector x(4);
-    Vector y(4);
-    x << 1, 1, 1, 1;
-    y << 100, 10, 1, 0;
-    ContextImpl context;
-    std::string message;
-    CHECK(context.InitCUDA(&message))
-        << "InitCUDA() failed because: " << message;
-    CudaVector x_gpu(&context, 4);
-    CudaVector y_gpu(&context, 4);
-    x_gpu.CopyFromCpu(x);
-    y_gpu.CopyFromCpu(y);
+TEST(CudaVector, AxpbyMemberFunctionBNotEqual1) {
+  Vector x(4);
+  Vector y(4);
+  x << 1, 1, 1, 1;
+  y << 100, 10, 1, 0;
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaVector x_gpu(&context, 4);
+  CudaVector y_gpu(&context, 4);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
 
-    Axpby(2.0, y_gpu, 3.0, x_gpu, x_gpu);
-    Vector result;
-    Vector expected(4);
-    expected << 203, 23, 5, 3;
-    x_gpu.CopyTo(&result);
-    EXPECT_EQ(result, expected);
-  }
-  {
-    Vector x(4);
-    Vector y(4);
-    x << 1, 1, 1, 1;
-    y << 100, 10, 1, 0;
-    ContextImpl context;
-    std::string message;
-    CHECK(context.InitCUDA(&message))
-        << "InitCUDA() failed because: " << message;
-    CudaVector x_gpu(&context, 10);
-    CudaVector y_gpu(&context, 10);
-    CudaVector z_gpu(&context, 10);
-    x_gpu.CopyFromCpu(x);
-    y_gpu.CopyFromCpu(y);
-    z_gpu.Resize(4);
-    z_gpu.SetZero();
+  x_gpu.Axpby(2.0, y_gpu, 3.0);
+  Vector result;
+  Vector expected(4);
+  expected << 203, 23, 5, 3;
+  x_gpu.CopyTo(&result);
+  EXPECT_EQ(result, expected);
+}
 
-    Axpby(2.0, y_gpu, 3.0, x_gpu, z_gpu);
-    Vector result;
-    Vector expected(4);
-    expected << 203, 23, 5, 3;
-    z_gpu.CopyTo(&result);
-    EXPECT_EQ(result, expected);
-  }
-  {
-    Vector x(4);
-    Vector y(4);
-    x << 1, 1, 1, 1;
-    y << 100, 10, 1, 0;
-    ContextImpl context;
-    std::string message;
-    CHECK(context.InitCUDA(&message))
-        << "InitCUDA() failed because: " << message;
-    CudaVector x_gpu(&context, 10);
-    CudaVector y_gpu(&context, 10);
-    x_gpu.CopyFromCpu(x);
-    y_gpu.CopyFromCpu(y);
+TEST(CudaVector, AxpbyMemberFunctionBEqual1) {
+  Vector x(4);
+  Vector y(4);
+  x << 1, 1, 1, 1;
+  y << 100, 10, 1, 0;
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaVector x_gpu(&context, 4);
+  CudaVector y_gpu(&context, 4);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
 
-    Axpby(2.0, x_gpu, 3.0, y_gpu, y_gpu);
-    Vector result;
-    Vector expected(4);
-    expected << 302, 32, 5, 2;
-    y_gpu.CopyTo(&result);
-    EXPECT_EQ(result, expected);
-  }
-  {
-    Vector x(4);
-    Vector y(4);
-    x << 1, 1, 1, 1;
-    y << 100, 10, 1, 0;
-    ContextImpl context;
-    std::string message;
-    CHECK(context.InitCUDA(&message))
-        << "InitCUDA() failed because: " << message;
-    CudaVector x_gpu(&context, 10);
-    CudaVector y_gpu(&context, 10);
-    x_gpu.CopyFromCpu(x);
-    y_gpu.CopyFromCpu(y);
+  x_gpu.Axpby(2.0, y_gpu, 1.0);
+  Vector result;
+  Vector expected(4);
+  expected << 201, 21, 3, 1;
+  x_gpu.CopyTo(&result);
+  EXPECT_EQ(result, expected);
+}
 
-    Axpby(2.0, x_gpu, 3.0, y_gpu, x_gpu);
-    Vector result;
-    Vector expected(4);
-    expected << 302, 32, 5, 2;
-    x_gpu.CopyTo(&result);
-    EXPECT_EQ(result, expected);
-  }
-  {
-    Vector x(4);
-    x << 100, 10, 1, 0;
-    ContextImpl context;
-    std::string message;
-    CHECK(context.InitCUDA(&message))
-        << "InitCUDA() failed because: " << message;
-    CudaVector x_gpu(&context, 10);
-    x_gpu.CopyFromCpu(x);
+TEST(CudaVector, AxpbyMemberXAliasesY) {
+  Vector x(4);
+  x << 100, 10, 1, 0;
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaVector x_gpu(&context, 4);
+  CudaVector y_gpu(&context, 4);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.SetZero();
 
-    Axpby(2.0, x_gpu, 3.0, x_gpu, x_gpu);
-    Vector result;
-    Vector expected(4);
-    expected << 500, 50, 5, 0;
-    x_gpu.CopyTo(&result);
-    EXPECT_EQ(result, expected);
-  }
+  x_gpu.Axpby(2.0, x_gpu, 1.0);
+  Vector result;
+  Vector expected(4);
+  expected << 300, 30, 3, 0;
+  x_gpu.CopyTo(&result);
+  EXPECT_EQ(result, expected);
+}
+
+TEST(CudaVector, AxpbyNonMemberMethodNoAliases) {
+  Vector x(4);
+  Vector y(4);
+  x << 1, 1, 1, 1;
+  y << 100, 10, 1, 0;
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaVector x_gpu(&context, 4);
+  CudaVector y_gpu(&context, 4);
+  CudaVector z_gpu(&context, 4);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
+  z_gpu.Resize(4);
+  z_gpu.SetZero();
+
+  Axpby(2.0, x_gpu, 3.0, y_gpu, z_gpu);
+  Vector result;
+  Vector expected(4);
+  expected << 302, 32, 5, 2;
+  z_gpu.CopyTo(&result);
+  EXPECT_EQ(result, expected);
+}
+
+TEST(CudaVector, AxpbyNonMemberMethodXAliasesY) {
+  Vector x(4);
+  x << 100, 10, 1, 0;
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaVector x_gpu(&context, 4);
+  CudaVector z_gpu(&context, 4);
+  x_gpu.CopyFromCpu(x);
+  z_gpu.SetZero();
+
+  Axpby(2.0, x_gpu, 3.0, x_gpu, z_gpu);
+  Vector result;
+  Vector expected(4);
+  expected << 500, 50, 5, 0;
+  z_gpu.CopyTo(&result);
+  EXPECT_EQ(result, expected);
+}
+
+TEST(CudaVector, AxpbyNonMemberMethodXAliasesZ) {
+  Vector x(4);
+  Vector y(4);
+  x << 1, 1, 1, 1;
+  y << 100, 10, 1, 0;
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaVector x_gpu(&context, 10);
+  CudaVector y_gpu(&context, 10);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
+
+  Axpby(2.0, x_gpu, 3.0, y_gpu, x_gpu);
+  Vector result;
+  Vector expected(4);
+  expected << 302, 32, 5, 2;
+  x_gpu.CopyTo(&result);
+  EXPECT_EQ(result, expected);
+}
+
+TEST(CudaVector, AxpbyNonMemberMethodYAliasesZ) {
+  Vector x(4);
+  Vector y(4);
+  x << 1, 1, 1, 1;
+  y << 100, 10, 1, 0;
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaVector x_gpu(&context, 4);
+  CudaVector y_gpu(&context, 4);
+  x_gpu.CopyFromCpu(x);
+  y_gpu.CopyFromCpu(y);
+
+  Axpby(2.0, x_gpu, 3.0, y_gpu, y_gpu);
+  Vector result;
+  Vector expected(4);
+  expected << 302, 32, 5, 2;
+  y_gpu.CopyTo(&result);
+  EXPECT_EQ(result, expected);
+}
+
+TEST(CudaVector, AxpbyNonMemberMethodXAliasesYAliasesZ) {
+  Vector x(4);
+  x << 100, 10, 1, 0;
+  ContextImpl context;
+  std::string message;
+  CHECK(context.InitCUDA(&message))
+      << "InitCUDA() failed because: " << message;
+  CudaVector x_gpu(&context, 10);
+  x_gpu.CopyFromCpu(x);
+
+  Axpby(2.0, x_gpu, 3.0, x_gpu, x_gpu);
+  Vector result;
+  Vector expected(4);
+  expected << 500, 50, 5, 0;
+  x_gpu.CopyTo(&result);
+  EXPECT_EQ(result, expected);
 }
 
 TEST(CudaVector, DtDxpy) {
