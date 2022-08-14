@@ -53,6 +53,8 @@ namespace {
 // Generate a synthetic BA-style Jacobian with n camera poses, m landmarks, n_d
 // parameters per camera, m_d parameters per landmark, and k residuals per
 // camera.
+// TODO: Unify the synthetic Jacobian generation code with the code from
+// schur_eliminator_benchmark.cc since they are very similar.
 std::unique_ptr<BlockSparseMatrix> GenerateSyntheticJacobian(
     int n, int m, int n_d, int m_d, int k) {
   static const int kResidualSize = 2;
