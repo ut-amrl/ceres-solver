@@ -592,7 +592,7 @@ if (BUILD_BENCHMARKS)
   add_dependencies_to_benchmark(dense_linear_solver_benchmark)
 
   add_executable(sparse_linear_operator_benchmark
-      sparse_linear_operator_benchmark.cc)
+    sparse_linear_operator_benchmark.cc)
   add_dependencies_to_benchmark(sparse_linear_operator_benchmark)
 
   add_subdirectory(autodiff_benchmarks)
