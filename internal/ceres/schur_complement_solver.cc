@@ -61,14 +61,12 @@ using std::vector;
 
 namespace {
 
-class BlockRandomAccessSparseMatrixAdapter
+class BlockRandomAccessSparseMatrixAdapter final
     : public ConjugateGradientsLinearOperator<Vector> {
  public:
   explicit BlockRandomAccessSparseMatrixAdapter(
       const BlockRandomAccessSparseMatrix& m)
       : m_(m) {}
-
-  virtual ~BlockRandomAccessSparseMatrixAdapter() final {}
 
   void RightMultiplyAndAccumulate(const Vector& x, Vector& y) final {
     m_.SymmetricRightMultiplyAndAccumulate(x.data(), y.data());
@@ -84,8 +82,6 @@ class BlockRandomAccessDiagonalMatrixAdapter final
   explicit BlockRandomAccessDiagonalMatrixAdapter(
       const BlockRandomAccessDiagonalMatrix& m)
       : m_(m) {}
-
-  virtual ~BlockRandomAccessDiagonalMatrixAdapter() final {}
 
   // y = y + Ax;
   void RightMultiplyAndAccumulate(const Vector& x, Vector& y) final {
