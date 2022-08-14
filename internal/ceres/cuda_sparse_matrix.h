@@ -42,11 +42,8 @@
 #include <memory>
 #include <string>
 
-#include "ceres/block_sparse_matrix.h"
 #include "ceres/compressed_row_sparse_matrix.h"
-#include "ceres/crs_matrix.h"
 #include "ceres/internal/export.h"
-#include "ceres/triplet_sparse_matrix.h"
 #include "ceres/types.h"
 #include "ceres/context_impl.h"
 
