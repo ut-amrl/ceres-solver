@@ -76,8 +76,6 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   int num_cols() const { return num_cols_; }
   int num_nonzeros() const { return num_nonzeros_; }
 
-  void CopyFrom(const CompressedRowSparseMatrix& crs_matrix);
-
   // If subsequent uses of this matrix involve only numerical changes and no
   // structural changes, then this method can be used to copy the updated
   // non-zero values -- the row and column index arrays are kept  the same. It
@@ -88,14 +86,10 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   const cusparseSpMatDescr_t& descr() const { return descr_; }
 
  private:
-  CudaSparseMatrix() = delete;
 
   // Disable copy and assignment.
   CudaSparseMatrix(const CudaSparseMatrix&) = delete;
   CudaSparseMatrix& operator=(const CudaSparseMatrix&) = delete;
-
-  // Destroy the cuSparse matrix descriptor if it exists.
-  void DestroyDescriptor();
 
   // y = y + op(M)x. op must be either CUSPARSE_OPERATION_NON_TRANSPOSE or
   // CUSPARSE_OPERATION_TRANSPOSE.
@@ -106,18 +100,18 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   int num_nonzeros_ = 0;
 
   // CSR row indices.
-  CudaBuffer<int32_t> csr_row_indices_;
+  CudaBuffer<int32_t> rows_;
   // CSR column indices.
-  CudaBuffer<int32_t> csr_col_indices_;
+  CudaBuffer<int32_t> cols_;
   // CSR values.
-  CudaBuffer<double> csr_values_;
+  CudaBuffer<double> values_;
 
   ContextImpl* context_ = nullptr;
 
   // CuSparse object that describes this matrix.
   cusparseSpMatDescr_t descr_ = nullptr;
 
-  CudaBuffer<uint8_t> buffer_;
+  CudaBuffer<uint8_t> spmv_buffer_;
 };
 
 }  // namespace ceres::internal

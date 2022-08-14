@@ -64,35 +64,31 @@ CudaSparseMatrix::CudaSparseMatrix(
   DCHECK_NE(context, nullptr);
   CHECK(context->IsCUDAInitialized());
   context_ = context;
-  CopyFrom(crs_matrix);
-}
-
-CudaSparseMatrix::~CudaSparseMatrix() {
-  DestroyDescriptor();
-}
-
-void CudaSparseMatrix::CopyFrom(const CompressedRowSparseMatrix& crs_matrix) {
   num_rows_ = crs_matrix.num_rows();
   num_cols_ = crs_matrix.num_cols();
   num_nonzeros_ = crs_matrix.num_nonzeros();
-  csr_row_indices_.CopyFromCpu(
+  rows_.CopyFromCpu(
       crs_matrix.rows(), num_rows_ + 1, context_->stream_);
-  csr_col_indices_.CopyFromCpu(
+  cols_.CopyFromCpu(
       crs_matrix.cols(), num_nonzeros_, context_->stream_);
-  csr_values_.CopyFromCpu(
+  values_.CopyFromCpu(
       crs_matrix.values(), num_nonzeros_, context_->stream_);
-  DestroyDescriptor();
   cusparseCreateCsr(&descr_,
                     num_rows_,
                     num_cols_,
                     num_nonzeros_,
-                    csr_row_indices_.data(),
-                    csr_col_indices_.data(),
-                    csr_values_.data(),
+                    rows_.data(),
+                    cols_.data(),
+                    values_.data(),
                     CUSPARSE_INDEX_32I,
                     CUSPARSE_INDEX_32I,
                     CUSPARSE_INDEX_BASE_ZERO,
                     CUDA_R_64F);
+}
+
+CudaSparseMatrix::~CudaSparseMatrix() {
+  CHECK_EQ(cusparseDestroySpMat(descr_), CUSPARSE_STATUS_SUCCESS);
+  descr_ = nullptr;
 }
 
 void CudaSparseMatrix::CopyValuesFromCpu(
@@ -103,15 +99,8 @@ void CudaSparseMatrix::CopyValuesFromCpu(
   CHECK_EQ(num_rows_, crs_matrix.num_rows());
   CHECK_EQ(num_cols_, crs_matrix.num_cols());
   CHECK_EQ(num_nonzeros_, crs_matrix.num_nonzeros());
-  csr_values_.CopyFromCpu(
+  values_.CopyFromCpu(
       crs_matrix.values(), num_nonzeros_, context_->stream_);
-}
-
-void CudaSparseMatrix::DestroyDescriptor() {
-  if (descr_) {
-    CHECK_EQ(cusparseDestroySpMat(descr_), CUSPARSE_STATUS_SUCCESS);
-    descr_ = nullptr;
-  }
 }
 
 void CudaSparseMatrix::SpMv(cusparseOperation_t op,
@@ -132,7 +121,7 @@ void CudaSparseMatrix::SpMv(cusparseOperation_t op,
                                    CUSPARSE_SPMV_ALG_DEFAULT,
                                    &buffer_size),
            CUSPARSE_STATUS_SUCCESS);
-  buffer_.Reserve(buffer_size);
+  spmv_buffer_.Reserve(buffer_size);
   CHECK_EQ(cusparseSpMV(context_->cusparse_handle_,
                         op,
                         &alpha,
@@ -142,7 +131,7 @@ void CudaSparseMatrix::SpMv(cusparseOperation_t op,
                         y->descr(),
                         CUDA_R_64F,
                         CUSPARSE_SPMV_ALG_DEFAULT,
-                        buffer_.data()),
+                        spmv_buffer_.data()),
            CUSPARSE_STATUS_SUCCESS);
 }
 
