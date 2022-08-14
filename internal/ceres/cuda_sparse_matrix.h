@@ -77,6 +77,12 @@ class CERES_NO_EXPORT CudaSparseMatrix {
   int num_nonzeros() const { return num_nonzeros_; }
 
   void CopyFrom(const CompressedRowSparseMatrix& crs_matrix);
+
+  // If subsequent uses of this matrix involve only numerical changes and no
+  // structural changes, then this method can be used to copy the updated
+  // non-zero values -- the row and column index arrays are kept  the same. It
+  // is the caller's responsibility to ensure that the sparsity structure of the
+  // matrix is unchanged.
   void CopyValuesFromCpu(const CompressedRowSparseMatrix& crs_matrix);
 
   const cusparseSpMatDescr_t& descr() const { return descr_; }

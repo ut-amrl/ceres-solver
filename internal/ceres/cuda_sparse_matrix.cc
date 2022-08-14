@@ -95,7 +95,8 @@ void CudaSparseMatrix::CopyFrom(const CompressedRowSparseMatrix& crs_matrix) {
                     CUDA_R_64F);
 }
 
-void CudaSparseMatrix::CopyValuesFromCpu(const CompressedRowSparseMatrix& crs_matrix) {
+void CudaSparseMatrix::CopyValuesFromCpu(
+    const CompressedRowSparseMatrix& crs_matrix) {
   // There is no quick and easy way to verify that the structure is unchanged,
   // but at least we can check that the size of the matrix and the number of
   // nonzeros is unchanged.
@@ -150,10 +151,8 @@ void CudaSparseMatrix::RightMultiplyAndAccumulate(const CudaVector& x, CudaVecto
 }
 
 void CudaSparseMatrix::LeftMultiplyAndAccumulate(const CudaVector& x, CudaVector* y) {
-  // TODO(Joydeep Biswas): If this operation is to be done frequently, we should
-  // store a CSC format of the matrix, which is incidentally the CSR format of
-  // the matrix transpose, and call cusparseSpMV with
-  // CUSPARSE_OPERATION_NON_TRANSPOSE. From the cuSPARSE documentation:
+  // TODO(Joydeep Biswas): We should consider storing a transposed copy of the
+  // matrix by converting CSR to CSC. From the cuSPARSE documentation:
   // "In general, opA == CUSPARSE_OPERATION_NON_TRANSPOSE is 3x faster than opA
   // != CUSPARSE_OPERATION_NON_TRANSPOSE"
   SpMv(CUSPARSE_OPERATION_TRANSPOSE, x, y);

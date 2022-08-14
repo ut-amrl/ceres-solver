@@ -230,6 +230,10 @@ TEST(CudaSparseMatrix, LeftMultiplyAndAccumulate) {
   EXPECT_EQ(x_computed, x_expected);
 }
 
+// If there are numerical errors due to synchronization issues, they will show
+// up when testing with large matrices, since each operation will take
+// significant time, thus hopefully revealing any potential synchronization
+// issues.
 TEST(CudaSparseMatrix, LargeMultiplyAndAccumulate) {
   // Create a large NxN matrix A that has the following structure:
   // In row i, only columns i and i+1 are non-zero.
