@@ -59,7 +59,6 @@ class CERES_NO_EXPORT ContextImpl final : public Context {
  public:
   ContextImpl();
   ~ContextImpl() override;
-  void Cleanup();
   ContextImpl(const ContextImpl&) = delete;
   void operator=(const ContextImpl&) = delete;
 

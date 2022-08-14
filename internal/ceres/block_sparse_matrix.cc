@@ -41,7 +41,6 @@
 #include "ceres/internal/eigen.h"
 #include "ceres/small_blas.h"
 #include "ceres/triplet_sparse_matrix.h"
-#include "ceres/wall_time.h"
 #include "glog/logging.h"
 
 namespace ceres::internal {
