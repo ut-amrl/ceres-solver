@@ -836,21 +836,6 @@ void WriteArrayToFileOrDie(const string& filename,
   fclose(fptr);
 }
 
-bool ReadArrayFromFile(const string& filename, std::vector<double>* x) {
-  CHECK(x != nullptr);
-  FILE* fptr = fopen(filename.c_str(), "r");
-  if (fptr == nullptr) {
-    return false;
-  }
-  double value = 0;
-  x->clear();
-  while (fscanf(fptr, "%lf", &value) == 1) {
-    x->push_back(value);
-  }
-  fclose(fptr);
-  return true;
-}
-
 bool DumpLinearLeastSquaresProblemToTextFile(const string& filename_base,
                                              const SparseMatrix* A,
                                              const double* D,
@@ -926,65 +911,6 @@ bool DumpLinearLeastSquaresProblem(const string& filename_base,
       LOG(FATAL) << "Unknown DumpFormatType " << dump_format_type;
   }
 
-  return true;
-}
-
-bool ReadLinearLeastSquaresProblemFromTextFile(const string& filename_base,
-                                               TripletSparseMatrix* A,
-                                               std::vector<double>* D,
-                                               std::vector<double>* b,
-                                               std::vector<double>* x) {
-  CHECK(A != nullptr);
-  CHECK(D != nullptr);
-  CHECK(b != nullptr);
-  CHECK(x != nullptr);
-  {
-    string filename = filename_base + "_A.txt";
-    FILE* fptr = fopen(filename.c_str(), "r");
-    CHECK(fptr != nullptr);
-    auto A_input = TripletSparseMatrix::CreateFromTextFile(fptr);
-    fclose(fptr);
-    if (A_input == nullptr) {
-      return false;
-    }
-    *A = *A_input;
-  }
-  const int num_rows = A->num_rows();
-  const int num_cols = A->num_cols();
-
-  {
-    string filename = filename_base + "_D.txt";
-    if (!ReadArrayFromFile(filename, D)) {
-      return false;
-    }
-    if (D->size() != num_cols) {
-      LOG(ERROR) << "D has wrong size: " << D->size()
-                 << " vs. " << num_cols;
-      return false;
-    }
-  }
-  {
-    string filename = filename_base + "_b.txt";
-    if (!ReadArrayFromFile(filename, b)) {
-      return false;
-    }
-    if (b->size() != num_rows) {
-      LOG(ERROR) << "b has wrong size: " << b->size()
-                 << " vs. " << num_rows;
-      return false;
-    }
-  }
-  {
-    string filename = filename_base + "_x.txt";
-    if (!ReadArrayFromFile(filename, x)) {
-      return false;
-    }
-    if (x->size() != num_cols) {
-      LOG(ERROR) << "x has wrong size: " << x->size()
-                 << " vs. " << num_cols;
-      return false;
-    }
-  }
   return true;
 }
 
