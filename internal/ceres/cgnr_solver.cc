@@ -260,7 +260,21 @@ std::unique_ptr<CudaCgnrSolver> CudaCgnrSolver::Create(
 
 void CudaCgnrSolver::CpuToGpuTransfer(
     const CompressedRowSparseMatrix& A, const double* b, const double* D) {
+
   if (A_ == nullptr) {
+    const int num_rows = A.num_rows();
+    const int num_cols = A.num_cols();
+    const int num_nonzeros = A.num_nonzeros();
+    const uint64_t A_size =
+      sizeof(uint32_t) * (num_rows + 1 + num_nonzeros) +
+      sizeof(double) * num_nonzeros;
+    const uint64_t memory_needed =
+        A_size +
+        2 * sizeof(double) * num_rows +
+        7 * sizeof(double) * num_cols;
+    printf("Total size: %.3f GB, A = %.3f GB\n",
+        memory_needed / 1024.0 / 1024.0 / 1024.0,
+        A_size / 1024.0 / 1024.0 / 1024.0);
     // Assume structure is not cached, do an initialization and structural copy.
     A_ = std::make_unique<CudaSparseMatrix>(options_.context, A);
     b_ = std::make_unique<CudaVector>(options_.context, A.num_rows());
