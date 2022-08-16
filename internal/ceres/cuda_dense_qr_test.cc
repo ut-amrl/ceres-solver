@@ -35,14 +35,16 @@
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 
-DEFINE_uint32(num_randomized_trials, 20, "Number of randomized tests to run.");
-
 namespace ceres::internal {
 
 #ifndef CERES_NO_CUDA
 
 TEST(CUDADenseQR, InvalidOptionOnCreate) {
   LinearSolver::Options options;
+  ContextImpl context;
+  options.context = &context;
+  std::string error;
+  EXPECT_TRUE(context.InitCUDA(&error)) << error;
   auto dense_cuda_solver = CUDADenseQR::Create(options);
   EXPECT_EQ(dense_cuda_solver, nullptr);
 }
@@ -60,6 +62,8 @@ TEST(CUDADenseQR, QR4x4Matrix) {
   LinearSolver::Options options;
   ContextImpl context;
   options.context = &context;
+  std::string error;
+  EXPECT_TRUE(context.InitCUDA(&error)) << error;
   options.dense_linear_algebra_library_type = CUDA;
   auto dense_cuda_solver = CUDADenseQR::Create(options);
   ASSERT_NE(dense_cuda_solver, nullptr);
@@ -92,6 +96,8 @@ TEST(CUDADenseQR, QR4x2Matrix) {
   LinearSolver::Options options;
   ContextImpl context;
   options.context = &context;
+  std::string error;
+  EXPECT_TRUE(context.InitCUDA(&error)) << error;
   options.dense_linear_algebra_library_type = CUDA;
   auto dense_cuda_solver = CUDADenseQR::Create(options);
   ASSERT_NE(dense_cuda_solver, nullptr);
@@ -114,6 +120,8 @@ TEST(CUDADenseQR, MustFactorizeBeforeSolve) {
   LinearSolver::Options options;
   ContextImpl context;
   options.context = &context;
+  std::string error;
+  EXPECT_TRUE(context.InitCUDA(&error)) << error;
   options.dense_linear_algebra_library_type = CUDA;
   auto dense_cuda_solver = CUDADenseQR::Create(options);
   ASSERT_NE(dense_cuda_solver, nullptr);
@@ -132,10 +140,13 @@ TEST(CUDADenseQR, Randomized1600x100Tests) {
   LinearSolver::Options options;
   ContextImpl context;
   options.context = &context;
+  std::string error;
+  EXPECT_TRUE(context.InitCUDA(&error)) << error;
   options.dense_linear_algebra_library_type = ceres::CUDA;
   std::unique_ptr<DenseQR> dense_qr = CUDADenseQR::Create(options);
 
-  for (int i = 0; i < FLAGS_num_randomized_trials; ++i) {
+  const int kNumTrials = 20;
+  for (int i = 0; i < kNumTrials; ++i) {
     LhsType lhs = LhsType::Random(kNumRows, kNumCols);
     SolutionType x_expected = SolutionType::Random(kNumCols);
     RhsType rhs = lhs * x_expected;

@@ -311,9 +311,8 @@ LinearSolverTerminationType LAPACKDenseQR::Solve(const double* rhs,
 #ifndef CERES_NO_CUDA
 
 bool CUDADenseQR::Init(ContextImpl* context, std::string* message) {
-  if (!context->InitCUDA(message)) {
-    return false;
-  }
+  CHECK(context->IsCUDAInitialized())
+      << "CUDADenseQR requires CUDA initialization.";
   cublas_handle_ = context->cublas_handle_;
   cusolver_handle_ = context->cusolver_handle_;
   stream_ = context->stream_;

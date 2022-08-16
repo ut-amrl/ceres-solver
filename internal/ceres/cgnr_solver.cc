@@ -232,7 +232,8 @@ class CERES_NO_EXPORT CudaIdentityPreconditioner final : public
   }
 };
 
-CudaCgnrSolver::CudaCgnrSolver() = default;
+CudaCgnrSolver::CudaCgnrSolver(LinearSolver::Options options) :
+    options_(std::move(options)) {}
 
 CudaCgnrSolver::~CudaCgnrSolver() {
   for (int i = 0; i < 4; ++i) {
@@ -251,11 +252,9 @@ std::unique_ptr<CudaCgnrSolver> CudaCgnrSolver::Create(
         std::string(PreconditionerTypeToString(options.preconditioner_type)) + ". ";
     return nullptr;
   }
-  if (!options.context->InitCUDA(error)) {
-    return nullptr;
-  }
-  std::unique_ptr<CudaCgnrSolver> solver(new CudaCgnrSolver());
-  solver->options_ = options;
+  CHECK(options.context->IsCUDAInitialized())
+      << "CudaCgnrSolver requires CUDA initialization.";
+  auto solver = std::make_unique<CudaCgnrSolver>(options);
   return solver;
 }
 

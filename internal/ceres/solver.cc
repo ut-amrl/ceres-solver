@@ -912,7 +912,8 @@ string Solver::Summary::FullReport() const {
         linear_solver_type_used == SPARSE_SCHUR ||
         (linear_solver_type_used == ITERATIVE_SCHUR &&
             (preconditioner_type_used == CLUSTER_JACOBI ||
-            preconditioner_type_used == CLUSTER_TRIDIAGONAL));
+            preconditioner_type_used == CLUSTER_TRIDIAGONAL)) ||
+        (linear_solver_type_used == CGNR && preconditioner_type_used == SUBSET);
 
     if (used_sparse_linear_algebra_library) {
       const char* mixed_precision_suffix =
