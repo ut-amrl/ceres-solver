@@ -95,8 +95,8 @@ DEFINE_bool(use_spse_initialization, false,
             "Use power series expansion to initialize the solution in ITERATIVE_SCHUR linear solver.");
 
 DEFINE_string(sparse_linear_algebra_library, "suite_sparse",
-              "Options are: suite_sparse, cx_sparse, accelerate_sparse, "
-              "eigen_sparse, and cuda_sparse.");
+              "Options are: suite_sparse, accelerate_sparse, eigen_sparse, and "
+              "cuda_sparse.");
 DEFINE_string(dense_linear_algebra_library, "eigen",
               "Options are: eigen, lapack, and cuda");
 DEFINE_string(ordering_type, "amd", "Options are: amd, nesdis");

@@ -35,16 +35,14 @@
 
 #include "ceres/block_jacobi_preconditioner.h"
 #include "ceres/conjugate_gradients_solver.h"
+#include "ceres/cuda_sparse_matrix.h"
+#include "ceres/cuda_vector.h"
 #include "ceres/internal/eigen.h"
 #include "ceres/linear_solver.h"
 #include "ceres/subset_preconditioner.h"
 #include "ceres/wall_time.h"
 #include "glog/logging.h"
 
-#ifndef CERES_NO_CUDA
-#include "ceres/cuda_sparse_matrix.h"
-#include "ceres/cuda_vector.h"
-#endif  // CERES_NO_CUDA
 
 namespace ceres::internal {
 
@@ -122,7 +120,14 @@ CgnrSolver::CgnrSolver(LinearSolver::Options options)
   }
 }
 
-CgnrSolver::~CgnrSolver() = default;
+CgnrSolver::~CgnrSolver()  {
+  for (int i = 0; i < 4; ++i) {
+    if (scratch_[i]) {
+      delete scratch_[i];
+      scratch_[i] = nullptr;
+    }
+  }
+}
 
 LinearSolver::Summary CgnrSolver::SolveImpl(
     BlockSparseMatrix* A,
@@ -168,17 +173,16 @@ LinearSolver::Summary CgnrSolver::SolveImpl(
 
   cg_solution_ = Vector::Zero(A->num_cols());
   for (int i = 0; i < 4; ++i) {
-    scratch_[i] = Vector::Zero(A->num_cols());
+    if (scratch_[i] == nullptr) {
+      scratch_[i] = new Vector(A->num_cols());
+    }
   }
   event_logger.AddEvent("Setup");
 
-  Vector* scratch_ptr[4] = {
-      &scratch_[0], &scratch_[1], &scratch_[2], &scratch_[3],
-  };
 
   LinearOperatorAdapter preconditioner(*preconditioner_);
   auto summary = ConjugateGradientsSolver(
-      cg_options, lhs, rhs, preconditioner, scratch_ptr, cg_solution_);
+      cg_options, lhs, rhs, preconditioner, scratch_, cg_solution_);
   VectorRef(x, A->num_cols()) = cg_solution_;
   event_logger.AddEvent("Solve");
   return summary;
@@ -198,7 +202,7 @@ class CERES_NO_EXPORT CudaCgnrLinearOperator final : public
     ConjugateGradientsLinearOperator<CudaVector> {
  public:
   CudaCgnrLinearOperator(CudaSparseMatrix& A,
-                         CudaVector* D,
+                         const CudaVector& D,
                          CudaVector* z) : A_(A), D_(D), z_(z) {}
 
   void RightMultiplyAndAccumulate(const CudaVector& x, CudaVector& y) final {
@@ -211,14 +215,12 @@ class CERES_NO_EXPORT CudaCgnrLinearOperator final : public
     A_.LeftMultiplyAndAccumulate(*z_, &y);
 
     // y = y + DtDx
-    if (D_ != nullptr) {
-      y.DtDxpy(*D_, x);
-    }
+    y.DtDxpy(D_, x);
   }
 
  private:
   CudaSparseMatrix& A_;
-  CudaVector* D_ = nullptr;
+  const CudaVector& D_;
   CudaVector* z_ = nullptr;
 };
 
@@ -232,13 +234,13 @@ class CERES_NO_EXPORT CudaIdentityPreconditioner final : public
 
 CudaCgnrSolver::CudaCgnrSolver() = default;
 
-CudaCgnrSolver::~CudaCgnrSolver() = default;
-
-bool CudaCgnrSolver::Init(
-    const LinearSolver::Options& options, std::string* error) {
-  options_ = options;
-  context_ = options.context;
-  return true;
+CudaCgnrSolver::~CudaCgnrSolver() {
+  for (int i = 0; i < 4; ++i) {
+    if (scratch_[i]) {
+      delete scratch_[i];
+      scratch_[i] = nullptr;
+    }
+  }
 }
 
 std::unique_ptr<CudaCgnrSolver> CudaCgnrSolver::Create(
@@ -253,11 +255,29 @@ std::unique_ptr<CudaCgnrSolver> CudaCgnrSolver::Create(
     return nullptr;
   }
   std::unique_ptr<CudaCgnrSolver> solver(new CudaCgnrSolver());
-  if (!solver->Init(options, error)) {
-    return nullptr;
-  }
   solver->options_ = options;
   return solver;
+}
+
+void CudaCgnrSolver::CpuToGpuTransfer(
+    const CompressedRowSparseMatrix& A, const double* b, const double* D) {
+  if (A_ == nullptr) {
+    // Assume structure is not cached, do an initialization and structural copy.
+    A_ = std::make_unique<CudaSparseMatrix>(options_.context, A);
+    b_ = std::make_unique<CudaVector>(options_.context, A.num_rows());
+    x_ = std::make_unique<CudaVector>(options_.context, A.num_cols());
+    Atb_ = std::make_unique<CudaVector>(options_.context, A.num_cols());
+    Ax_ = std::make_unique<CudaVector>(options_.context, A.num_rows());
+    D_ = std::make_unique<CudaVector>(options_.context, A.num_cols());
+    for (int i = 0; i < 4; ++i) {
+      scratch_[i] = new CudaVector(options_.context, A.num_cols());
+    }
+  } else {
+    // Assume structure is cached, do a value copy.
+    A_->CopyValuesFromCpu(A);
+  }
+  b_->CopyFromCpu(ConstVectorRef(b, A.num_rows()));
+  D_->CopyFromCpu(ConstVectorRef(D, A.num_cols()));
 }
 
 LinearSolver::Summary CudaCgnrSolver::SolveImpl(
@@ -265,61 +285,23 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
     const double* b,
     const LinearSolver::PerSolveOptions& per_solve_options,
     double* x) {
-  static const bool kDebug = false;
   EventLogger event_logger("CudaCgnrSolver::Solve");
   LinearSolver::Summary summary;
   summary.num_iterations = 0;
   summary.termination_type = LinearSolverTerminationType::FATAL_ERROR;
 
-  if (A_ == nullptr) {
-    // Assume structure is not cached, do an initialization and structural copy.
-    A_ = std::make_unique<CudaSparseMatrix>(options_.context, *A);
-    b_ = std::make_unique<CudaVector>(options_.context, A->num_rows());
-    x_ = std::make_unique<CudaVector>(options_.context, A->num_cols());
-    Atb_ = std::make_unique<CudaVector>(options_.context, A->num_cols());
-    Ax_ = std::make_unique<CudaVector>(options_.context, A->num_rows());
-    D_ = std::make_unique<CudaVector>(options_.context, A->num_cols());
-    if (A_ == nullptr ||
-        b_ == nullptr ||
-        x_ == nullptr ||
-        Atb_ == nullptr ||
-        Ax_ == nullptr ||
-        D_ == nullptr) {
-      summary.message = "Cuda Matrix or Vector initialization failed.";
-      return summary;
-    }
-    for (int i = 0; i < 4; ++i) {
-      scratch_[i] = std::make_unique<CudaVector>(
-          options_.context, A->num_cols());
-      if (scratch_[i] == nullptr) {
-        summary.message = "CudaVector::Create failed.";
-        return summary;
-      }
-    }
-    event_logger.AddEvent("Initialize + A CPU to GPU Transfer");
-  } else {
-    // Assume structure is cached, do a value copy.
-    A_->CopyValuesFromCpu(*A);
-    event_logger.AddEvent("A CPU to GPU Transfer");
-  }
-  b_->CopyFromCpu(ConstVectorRef(b, A->num_rows()));
-  D_->CopyFromCpu(ConstVectorRef(per_solve_options.D, A->num_cols()));
-  event_logger.AddEvent("b CPU to GPU Transfer");
+  CpuToGpuTransfer(*A, b, per_solve_options.D);
+  event_logger.AddEvent("CPU to GPU Transfer");
 
   // Form z = Atb.
   Atb_->SetZero();
   A_->LeftMultiplyAndAccumulate(*b_, Atb_.get());
-  if (kDebug) printf("z = Atb\n");
-
-  LinearSolver::PerSolveOptions cg_per_solve_options = per_solve_options;
-  cg_per_solve_options.preconditioner = nullptr;
 
   // Solve (AtA + DtD)x = z (= Atb).
   x_->SetZero();
-  CudaCgnrLinearOperator lhs(*A_, D_.get(), Ax_.get());
+  CudaCgnrLinearOperator lhs(*A_, *D_, Ax_.get());
 
   event_logger.AddEvent("Setup");
-  if (kDebug) printf("Solve (AtA + DtD)x = z (= Atb)\n");
 
   ConjugateGradientsSolverOptions cg_options;
   cg_options.min_num_iterations = options_.min_num_iterations;
@@ -328,13 +310,9 @@ LinearSolver::Summary CudaCgnrSolver::SolveImpl(
   cg_options.q_tolerance = per_solve_options.q_tolerance;
   cg_options.r_tolerance = per_solve_options.r_tolerance;
 
-  CudaVector* scratch_ptr[4] = {
-    scratch_[0].get(), scratch_[1].get(), scratch_[2].get(), scratch_[3].get()
-  };
-
   CudaIdentityPreconditioner preconditioner;
   summary = ConjugateGradientsSolver(
-      cg_options, lhs, *Atb_, preconditioner, scratch_ptr, *x_);
+      cg_options, lhs, *Atb_, preconditioner, scratch_, *x_);
   x_->CopyTo(x);
   event_logger.AddEvent("Solve");
   return summary;

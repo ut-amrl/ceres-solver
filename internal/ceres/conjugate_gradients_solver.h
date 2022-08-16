@@ -100,9 +100,9 @@ struct ConjugateGradientsSolverOptions {
 // allows us to have a single implementation that works on CPU and GPU based
 // matrices and vectors.
 //
-// scratch must contain four DenseVector objects of the same size as rhs and
-// solution. By asking the user for scratch space, we guarantee that we will not
-// perform any allocations inside this function.
+// scratch must contain pointers to four DenseVector objects of the same size as
+// rhs and solution. By asking the user for scratch space, we guarantee that we
+// will not perform any allocations inside this function.
 template <typename DenseVectorType>
 LinearSolver::Summary ConjugateGradientsSolver(
     const ConjugateGradientsSolverOptions options,
