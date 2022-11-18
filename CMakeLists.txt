@@ -231,6 +231,8 @@ if (Eigen3_FOUND)
 endif (Eigen3_FOUND)
 
 if (USE_CUDA)
+  include(CheckCuda)
+  detect_if_cuda_version_is_supported()
   if (CMAKE_VERSION VERSION_LESS 3.17)
     # On older versions of CMake (20.04 default is 3.16) FindCUDAToolkit was
     # not available, but FindCUDA was deprecated. To avoid special-case handling
