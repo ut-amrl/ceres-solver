@@ -33,16 +33,21 @@
 
 function(detect_if_cuda_version_is_supported)
   if(${CUDAToolkit_VERSION})
-    if(${CUDAToolkit_VERSION} VERSION_LESS "11.1")
+    if(${CUDAToolkit_VERSION} VERSION_LESS "12.1")
       message("-- CUDA version ${CUDAToolkit_VERSION} is insufficient "
           " (< 11.1), CUDA disabled.")
+      set(CUDAToolkit_FOUND FALSE)
     endif()
-  endif()
-  if(${CUDA_VERSION})
-    if(${CUDA_VERSION} VERSION_LESS "11.1")
+  elseif(${CUDA_VERSION})
+    if(${CUDA_VERSION} VERSION_LESS "12.1")
       message("-- Found CUDA version ${CUDA_VERSION} is insufficient"
         " (< 11.1), CUDA disabled.")
+      set(CUDA_FOUND FALSE)
     endif()
+  else()
+    message("-- CUDA version not found, CUDA disabled.")
+    set(CUDA_FOUND FALSE)
+    set(CUDAToolkit_FOUND FALSE)
   endif()
 
 endfunction()
