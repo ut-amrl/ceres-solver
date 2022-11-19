@@ -231,7 +231,6 @@ if (Eigen3_FOUND)
 endif (Eigen3_FOUND)
 
 if (USE_CUDA)
-  include(CheckCuda)
   if (CMAKE_VERSION VERSION_LESS 3.17)
     # On older versions of CMake (20.04 default is 3.16) FindCUDAToolkit was
     # not available, but FindCUDA was deprecated. To avoid special-case handling
@@ -239,7 +238,6 @@ if (USE_CUDA)
     # expected CMake imported targets and defined variables. This can be removed
     # from as soon as the min CMake version is >= 3.17.
     find_package(CUDA QUIET)
-    detect_if_cuda_version_is_supported()
     if (CUDA_FOUND)
       message("-- Found CUDA version ${CUDA_VERSION} installed in: "
         "${CUDA_TOOLKIT_ROOT_DIR} via legacy (< 3.17) CMake module. "
